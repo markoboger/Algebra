@@ -116,4 +116,85 @@ val r3: Rational = 1 / 3
 
 val r4 = Rational(4, 7)
 val r5 = Rational(5, 9)
+r4 + r5
+r4 - r5
 r4 * r5
+r4 / r5
+
+// Rational numbers are not as fast as Doubles, but they are more precise.
+
+// There is a type called Real, which is a decimal number of arbitrary precision.
+
+import spire.math.Real
+import spire.math.atan
+
+val real = Real(3.14)
+
+// Real numbers support trigonometric functions like sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh
+// They also support exponential functions like exp and log
+// And they support power functions like pow
+// The precision of Real numbers is limited by the memory of the computer.
+
+val PI =
+  Real(16) * atan(Real(Rational(1, 5))) - Real(4) * atan(Real(Rational(1, 239)))
+
+// Spire also has a type called Complex, which is a complex number with a Real part and an Imaginary part.
+// Complex number can be formed from whole numbers - or Integers, but also from Rational or Real numbers.
+import spire.math.Complex
+
+val c = Complex(3, 4)
+
+val c1 = Complex(Rational(2, 3), Rational(5, 7))
+val c2 = Complex(3.4, 1.9)
+
+// This is called a generic type, because it can be used with any type of number.
+// In fact Complex numbers can be used with any type of number that is a subtype of Number.
+// This is called polymorphism, because the same code can be used with different types of numbers.
+
+// Subtypes of Number are Int, Long, Short, Byte, BigInt, Float, Double, BigDecimal, Rational, Real, and Complex
+// so we can use Complex numbers with all of these types.
+
+// For all of these types we have operators like +, -, *, /, %, and ^, which work the same way for all types of numbers.
+// This is called operator overloading, because the same operator can be used with different types of numbers.
+
+3 + 4 - 5 * 6 / 7
+
+3.0 + 4.0 - 5.0 * 6.0 / 7.0
+
+Rational(3, 1) + Rational(4, 1) - Rational(5, 1) * Rational(6, 1) / Rational(
+  7,
+  1
+)
+
+Real(3) + Real(4) - Real(5) * Real(6) / Real(7)
+
+// We also have comparison operators like ==, !=, <, >, <=, and >=, which work the same way for all types of numbers.
+
+3 == 3
+3 != 4
+3 < 4
+3 > 4
+3 <= 4
+
+3.0 == 3.0
+3.0 != 4.0
+3.0 < 4.0
+
+Rational(3, 1) == Rational(3, 1)
+Rational(3, 1) != Rational(4, 1)
+Rational(3, 1) < Rational(4, 1)
+
+Real(3) == Real(3)
+Real(3) != Real(4)
+
+// We also have logical operators like &&, ||, and !, which work the same way for all types of numbers.
+
+(3 == 3) && (4 != 5)
+(3 < 4) || (5 > 6)
+
+// From Algebra we know that the operations on numbers have certain properties.
+// For example, addition is commutative, which means that a + b = b + a for all numbers a and b.
+// And addition is associative, which means that (a + b) + c = a + (b + c) for all numbers a, b, and c.
+
+// If these properties are satisfied, we say that the numbers form a group under addition.
+// Spire has a type called Group, which represents a group under addition.
