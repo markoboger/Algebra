@@ -60,7 +60,7 @@ import scala.math.BigInt
 val b = BigInt("123456789012345678901234567890")
 b * b
 
-//Why don't we use BigInt all the time? Because they are slower and take up more memory than Integers.
+// Why don't we use BigInt all the time? Because they are slower and take up more memory than Integers.
 // So we only use them when we need to.
 
 // There are also Number types for decimals.
