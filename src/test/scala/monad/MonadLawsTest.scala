@@ -2,95 +2,160 @@ package monad
 
 import munit.FunSuite
 
-/** Tests verifying that MonadicPack obeys the monad laws.
+/** Tests verifying monad laws for Pack and Crate.
  *
- * The three monad laws ensure predictable composition:
+ * The three monad laws must hold:
  * 1. Left identity: pure(a).flatMap(f) ≡ f(a)
- * 2. Right identity: m.flatMap(pure) ≡ m
+ * 2. Right identity: m.flatMap(pure) ≡ m  
  * 3. Associativity: m.flatMap(f).flatMap(g) ≡ m.flatMap(x => f(x).flatMap(g))
  *
- * These laws guarantee that monadic code can be refactored and composed
- * without changing behavior, making for-comprehensions reliable.
+ * We test with explicit values representing common cases.
  */
 class MonadLawsTest extends FunSuite:
   
-  import Model.*
-  import MonadLaws.*
+  import MonadStyle.*
   
-  test("MonadicPack obeys left identity law"):
-    val bottle = fullBottle
-    val f = (b: Bottle) => MonadicPack(List(Some(b), Some(b)))
-    
-    assert(leftIdentity(bottle, f))
+  // Test helpers
+  val f = (x: Int) => Pack(List(x, x * 2))
+  val g = (x: Int) => Pack(List(x * 3))
+  val h = (x: Int) => Pack(List(x + 1, x - 1))
   
-  test("MonadicPack obeys right identity law"):
-    val pack = MonadicPack(List(Some(fullBottle), None, Some(emptyBottle)))
-    
-    assert(rightIdentity(pack))
+  // Pack monad laws
   
-  test("MonadicPack obeys associativity law"):
-    val pack = MonadicPack(List(Some(fullBottle), Some(emptyBottle)))
-    val f = (b: Bottle) => MonadicPack(List(Some(b), Some(b)))
-    val g = (b: Bottle) => if b.empty then MonadicPack(List(None)) else MonadicPack(List(Some(b)))
+  test("Pack left identity: pure(a).flatMap(f) = f(a)"):
+    val testValues = List(0, 1, 42, -5, 100)
     
-    assert(associativity(pack, f, g))
+    for a <- testValues do
+      val lhs = Pack.pure(a).flatMap(f)
+      val rhs = f(a)
+      assertEquals(lhs, rhs, s"Failed for value $a")
   
-  test("MonadicPack map preserves structure"):
-    val pack = MonadicPack(List(Some(fullBottle), None, Some(emptyBottle)))
-    val mapped = pack.map(b => { b.consume(); b })
+  test("Pack right identity: m.flatMap(pure) = m"):
+    val testPacks = List(
+      Pack(List(1, 2, 3)),
+      Pack(List(42)),
+      Pack(List()),
+      Pack(List(0, -1, 5, 10))
+    )
     
-    assertEquals(mapped.bottles.length, 3)
-    assertEquals(mapped.bottles(1), None)
+    for pack <- testPacks do
+      assertEquals(pack.flatMap(Pack.pure), pack)
   
-  test("MonadicPack flatMap chains correctly"):
-    val pack = MonadicPack(List(Some(fullBottle), Some(emptyBottle)))
+  test("Pack associativity: m.flatMap(f).flatMap(g) = m.flatMap(x => f(x).flatMap(g))"):
+    val testPacks = List(
+      Pack(List(1, 2)),
+      Pack(List(5)),
+      Pack(List(0, 10, 20))
+    )
     
-    // FlatMap that duplicates each bottle
-    val result = pack.flatMap(b => MonadicPack(List(Some(b), Some(b))))
-    
-    assertEquals(result.present.length, 4)
+    for pack <- testPacks do
+      val lhs = pack.flatMap(f).flatMap(g)
+      val rhs = pack.flatMap(x => f(x).flatMap(g))
+      assertEquals(lhs, rhs)
   
-  test("MonadicPack withFilter removes elements"):
-    val pack = MonadicPack(List(Some(fullBottle), Some(emptyBottle), None, Some(fullBottle)))
-    val filtered = pack.withFilter(b => !b.empty)
-    
-    assertEquals(filtered.present.length, 2)
-    assert(filtered.present.forall(!_.empty))
+  // Crate monad laws
   
-  test("MonadicCrate flatMap enables nested iteration"):
-    val mPack1 = MonadicPack(List(Some(fullBottle), Some(fullBottle)))
-    val mPack2 = MonadicPack(List(Some(emptyBottle)))
-    val crate = MonadicCrate(List(Some(mPack1), None, Some(mPack2)))
+  test("Crate left identity: pure(a).flatMap(f) = Crate(List(f(a)))"):
+    val testValues = List(0, 1, 42)
     
-    assertEquals(crate.allBottles.length, 3)
-    assertEquals(crate.presentPacks.length, 2)
+    for a <- testValues do
+      val lhs = Crate.pure(a).flatMap(f)
+      val rhs = Crate(List(f(a)))
+      assertEquals(lhs, rhs, s"Failed for value $a")
   
-  test("for-comprehension over MonadicCrate works correctly"):
-    val mPack1 = MonadicPack(List(Some(fullBottle), None, Some(fullBottle)))
-    val mPack2 = MonadicPack(List(Some(emptyBottle), Some(fullBottle)))
-    val crate = MonadicCrate(List(Some(mPack1), Some(mPack2)))
+  test("Crate right identity: m.flatMap(pure) = m"):
+    val testCrates = List(
+      Crate(List(Pack(List(1, 2)), Pack(List(3)))),
+      Crate(List(Pack(List(42)))),
+      Crate(List()),
+      Crate(List(Pack(List()), Pack(List(1))))
+    )
     
-    val fullBottles = for
-      pack <- crate.presentPacks
-      bottle <- pack.present
-      if !bottle.empty
-    yield bottle
-    
-    assertEquals(fullBottles.length, 3)
+    for crate <- testCrates do
+      assertEquals(crate.flatMap(Pack.pure), crate)
   
-  test("functor law: map(id) == id"):
-    val pack = MonadicPack(List(Some(fullBottle), None, Some(emptyBottle)))
-    val identity: Bottle => Bottle = b => b
+  test("Crate associativity: m.flatMap(f).flatMap(g) = m.flatMap(x => f(x).flatMap(g))"):
+    val testCrates = List(
+      Crate(List(Pack(List(1, 2)))),
+      Crate(List(Pack(List(5)), Pack(List(10)))),
+      Crate(List(Pack(List(0))))
+    )
     
-    assertEquals(pack.map(identity).present, pack.present)
+    for crate <- testCrates do
+      val lhs = crate.flatMap(f).flatMap(g)
+      val rhs = crate.flatMap(x => f(x).flatMap(g))
+      assertEquals(lhs, rhs)
   
-  test("functor law: map(f . g) == map(f) . map(g)"):
-    val pack = MonadicPack(List(Some(fullBottle), Some(fullBottle)))
-    val f = (b: Bottle) => { b.consume(); b }
-    val g = (b: Bottle) => b
+  // Functor laws (prerequisite for monad)
+  
+  test("Pack functor identity: map(id) = id"):
+    val testPacks = List(
+      Pack(List(1, 2, 3)),
+      Pack(List()),
+      Pack(List(42))
+    )
     
-    val composed = pack.map(b => f(g(b)))
-    val chained = pack.map(g).map(f)
+    for pack <- testPacks do
+      assertEquals(pack.map(identity), pack)
+  
+  test("Pack functor composition: map(f . g) = map(g).map(f)"):
+    val testPacks = List(
+      Pack(List(1, 2, 3)),
+      Pack(List(5)),
+      Pack(List(0, 10))
+    )
+    val funF = (x: Int) => x * 2
+    val funG = (x: Int) => x + 1
     
-    // Both should have same structure (all empty after consuming)
-    assertEquals(composed.present.map(_.empty), chained.present.map(_.empty))
+    for pack <- testPacks do
+      val lhs = pack.map(x => funF(funG(x)))
+      val rhs = pack.map(funG).map(funF)
+      assertEquals(lhs, rhs)
+  
+  test("Crate functor identity: map(id) = id"):
+    val testCrates = List(
+      Crate(List(Pack(List(1, 2)), Pack(List(3)))),
+      Crate(List()),
+      Crate(List(Pack(List(42))))
+    )
+    
+    for crate <- testCrates do
+      assertEquals(crate.map(identity), crate)
+  
+  test("Crate functor composition: map(f . g) = map(g).map(f)"):
+    val testCrates = List(
+      Crate(List(Pack(List(1, 2)))),
+      Crate(List(Pack(List(5)), Pack(List(10))))
+    )
+    val funF = (x: Int) => x * 2
+    val funG = (x: Int) => x + 1
+    
+    for crate <- testCrates do
+      val lhs = crate.map(x => funF(funG(x)))
+      val rhs = crate.map(funG).map(funF)
+      assertEquals(lhs, rhs)
+  
+  // Additional monad tests with Option
+  
+  test("for-comprehension over Pack with Option"):
+    val pack = Pack(List(Some(1): Option[Int], None, Some(3): Option[Int]))
+    val result = for
+      opt <- pack.bottles
+      n <- opt
+    yield n * 2
+    
+    assertEquals(result, List(2, 6))
+  
+  test("for-comprehension over Crate with Option"):
+    val crate = Crate(List(
+      Pack(List(Some(1): Option[Int], None)),
+      Pack(List(Some(3): Option[Int]))
+    ))
+    
+    val result = for
+      pack <- crate.packs
+      opt <- pack.bottles
+      n <- opt
+    yield n * 2
+    
+    assertEquals(result, List(2, 6))

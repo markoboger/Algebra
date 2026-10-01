@@ -2,98 +2,69 @@ package monad
 
 /** Exception-based error handling approach.
  *
- * This implementation demonstrates using exceptions for control flow:
- * - Throws exceptions when encountering missing data
- * - Uses try-catch blocks to handle errors
- * - Cleaner than null checks (no deep nesting)
- * - But exceptions are expensive and semantically wrong for "expected" missing data
- * - Mixes business logic with error handling
- *
- * This is better than null checks but still has drawbacks:
- * - Performance overhead of exception creation and stack unwinding
- * - try-catch can be far from the throw, making flow unclear
- * - Exceptions are for exceptional circumstances, not normal flow
+ * In this style, domain accessors throw exceptions when data is missing,
+ * and client code uses try-catch to handle errors. This is how an experienced
+ * Java developer would structure exception-based error handling.
  */
 
-class MissingDataException(message: String) extends Exception(message)
+class MissingBottleException extends Exception("Bottle is missing")
+class MissingPackException extends Exception("Pack is missing")
+
+/** A pack where accessing bottles may throw. */
+case class ExceptionPack(private val bottles: List[Bottle | Null]):
+  def getBottles: List[Bottle] =
+    if bottles == null then throw MissingBottleException()
+    // Filter out nulls and return valid bottles
+    bottles.filter(_ != null).asInstanceOf[List[Bottle]]
+
+/** A crate where accessing packs may throw. */
+case class ExceptionCrate(private val packs: List[ExceptionPack | Null]):
+  def getPacks: List[ExceptionPack] =
+    if packs == null then throw MissingPackException()
+    // Filter out nulls and return valid packs
+    packs.filter(_ != null).asInstanceOf[List[ExceptionPack]]
 
 object ExceptionStyle:
   
-  /** Count full bottles in a crate, handling exceptions for each missing part.
-   *
-   * Instead of nested null checks, we use try-catch blocks at each level
-   * to handle missing data. This allows us to continue processing even when
-   * some elements are missing, similar to the null-check approach.
-   */
-  def countFullBottles(crate: Crate | Null): Int =
-    if crate == null then
-      println("  Error: Crate is null")
-      return 0
-    
+  /** Count full bottles, catching exceptions when data is missing. */
+  def countFullBottles(crate: ExceptionCrate): Int =
     var count = 0
-    val packs = crate.packs
-    
-    if packs == null then
-      println("  Error: Packs list is null")
-      return 0
-    
-    for pack <- packs do
-      try
-        if pack == null then
-          throw MissingDataException("Pack is null")
-        
-        val bottles = pack.bottles
-        if bottles == null then
-          throw MissingDataException("Bottles list is null")
-        
-        for bottle <- bottles do
-          try
-            if bottle == null then
-              throw MissingDataException("Bottle is null")
-            
-            if !bottle.empty then
-              count += 1
-          catch
-            case e: MissingDataException =>
-              // Skip this bottle and continue
-              ()
-      catch
-        case e: MissingDataException =>
-          // Skip this pack and continue
-          ()
+    try
+      val packs = crate.getPacks
+      for pack <- packs do
+        try
+          val bottles = pack.getBottles
+          for bottle <- bottles do
+            if bottle.full then count += 1
+        catch
+          case _: MissingBottleException => 
+            // Skip bottles in this pack that are missing
+            ()
+    catch
+      case _: MissingPackException => 
+        // Skip packs that are missing
+        ()
     
     count
   
-  /** Consume all bottles in a crate, handling exceptions for missing parts. */
-  def consumeAll(crate: Crate | Null): Unit =
-    if crate == null then
-      println("  Error: Crate is null")
-      return
+  /** Consume all accessible bottles. */
+  def consumeAll(crate: ExceptionCrate): List[Bottle] =
+    val consumed = scala.collection.mutable.ListBuffer[Bottle]()
+    try
+      val packs = crate.getPacks
+      for pack <- packs do
+        try
+          val bottles = pack.getBottles
+          for bottle <- bottles do
+            consumed += bottle.consume()
+        catch
+          case _: MissingBottleException => 
+            // Skip bottles in this pack that are missing
+            ()
+    catch
+      case _: MissingPackException => 
+        // Skip packs that are missing
+        ()
     
-    val packs = crate.packs
-    if packs == null then
-      println("  Error: Packs list is null")
-      return
-    
-    for pack <- packs do
-      try
-        if pack == null then
-          throw MissingDataException("Pack is null")
-        
-        val bottles = pack.bottles
-        if bottles == null then
-          throw MissingDataException("Bottles list is null")
-        
-        for bottle <- bottles do
-          try
-            if bottle == null then
-              throw MissingDataException("Bottle is null")
-            
-            bottle.consume()
-            println(s"  Consumed: $bottle")
-          catch
-            case e: MissingDataException =>
-              println(s"  Error: ${e.getMessage}")
-      catch
-        case e: MissingDataException =>
-          println(s"  Error: ${e.getMessage}")
+    consumed.toList
+

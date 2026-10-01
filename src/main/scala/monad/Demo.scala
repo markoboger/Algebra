@@ -1,13 +1,8 @@
 package monad
 
-/** Demonstration of three approaches to handling missing data.
+/** Demonstration comparing three approaches side-by-side.
  *
- * Run this to see side-by-side comparison of:
- * 1. Java-style imperative null checks
- * 2. Exception-based error handling
- * 3. Monad-based functional composition
- *
- * All three handle the same test cases to enable fair comparison.
+ * All three handle identical test cases to enable fair comparison.
  */
 object Demo:
   
@@ -16,88 +11,110 @@ object Demo:
     println("Monad Teaching Example: Three Approaches to Handling Missing Data")
     println("=" * 70)
     
-    // Test Case 1: Perfect crate (all bottles present and full)
-    println("\n--- Test Case 1: Perfect Crate ---")
-    testPerfectCrate()
-    
-    // Test Case 2: Crate with some missing bottles
-    println("\n--- Test Case 2: Crate with Missing Bottles ---")
-    testMissingBottles()
-    
-    // Test Case 3: Completely null crate
-    println("\n--- Test Case 3: Null Crate ---")
-    testNullCrate()
+    testCase1()
+    testCase2()
+    testCase3()
     
     println("\n" + "=" * 70)
-    println("Summary:")
-    println("- Java Style: Deeply nested null checks, verbose, error-prone")
-    println("- Exception Style: Flatter code, but exceptions are expensive")
-    println("- Monad Style: Flat for-comprehensions, type-safe, composable")
+    println("Comparison:")
+    println("  Java Style: Manual null checks at every level (verbose, error-prone)")
+    println("  Exception Style: Domain throws, client catches (cleaner but expensive)")
+    println("  Monad Style: For-comprehensions over lawful monads (flat, type-safe)")
     println("=" * 70)
   
-  /** Test with a perfect crate (no missing data). */
-  def testPerfectCrate(): Unit =
-    import Model.*
+  def testCase1(): Unit =
+    println("\n--- Test Case 1: Complete Crate (no missing data) ---")
     
-    // Create test data for imperative/exception styles
-    val pack1 = Pack(List(fullBottle, fullBottle, fullBottle))
-    val pack2 = Pack(List(fullBottle, fullBottle))
-    val crate = Crate(List(pack1, pack2))
+    // Java style
+    val javaPacks = List(
+      JavaPack(List(Bottle(), Bottle())),
+      JavaPack(List(Bottle(), Bottle(), Bottle()))
+    )
+    val javaCrate = JavaCrate(javaPacks)
+    val javaCount = JavaStyle.countFullBottles(javaCrate)
     
-    // Create equivalent monadic data
-    val mPack1 = MonadicPack(List(Some(fullBottle), Some(fullBottle), Some(fullBottle)))
-    val mPack2 = MonadicPack(List(Some(fullBottle), Some(fullBottle)))
-    val mCrate = MonadicCrate(List(Some(mPack1), Some(mPack2)))
+    // Exception style
+    val exPacks = List(
+      ExceptionPack(List(Bottle(), Bottle())),
+      ExceptionPack(List(Bottle(), Bottle(), Bottle()))
+    )
+    val exCrate = ExceptionCrate(exPacks)
+    val exCount = ExceptionStyle.countFullBottles(exCrate)
     
-    println("\nJava Style (null checks):")
-    val count1 = JavaStyle.countFullBottles(crate)
-    println(s"  Full bottles: $count1")
+    // Monad style
+    val monadPacks = List(
+      MonadStyle.Pack(List(Some(Bottle()): Option[Bottle], Some(Bottle()): Option[Bottle])),
+      MonadStyle.Pack(List(Some(Bottle()): Option[Bottle], Some(Bottle()): Option[Bottle], Some(Bottle()): Option[Bottle]))
+    )
+    val monadCrate = MonadStyle.Crate(monadPacks)
+    val monadCount = MonadStyle.countFullBottles(monadCrate)
     
-    println("\nException Style:")
-    val count2 = ExceptionStyle.countFullBottles(crate)
-    println(s"  Full bottles: $count2")
-    
-    println("\nMonad Style:")
-    val count3 = MonadStyle.countFullBottles(mCrate)
-    println(s"  Full bottles: $count3")
+    println(s"  Java Style:      $javaCount full bottles")
+    println(s"  Exception Style: $exCount full bottles")
+    println(s"  Monad Style:     $monadCount full bottles")
   
-  /** Test with some missing bottles (null in imperative, None in monadic). */
-  def testMissingBottles(): Unit =
-    import Model.*
+  def testCase2(): Unit =
+    println("\n--- Test Case 2: Missing Bottles ---")
     
-    // Create test data with nulls for imperative/exception styles
-    val pack3 = Pack(List(fullBottle, null, fullBottle))
-    val pack4 = Pack(List(null, fullBottle))
-    val crate = Crate(List(pack3, pack4))
+    // Java style: null for missing bottles
+    val javaPacks = List(
+      JavaPack(List(Bottle(), null, Bottle())),
+      JavaPack(List(null, Bottle()))
+    )
+    val javaCrate = JavaCrate(javaPacks)
+    val javaCount = JavaStyle.countFullBottles(javaCrate)
     
-    // Create equivalent monadic data with None
-    val mPack3 = MonadicPack(List(Some(fullBottle), None, Some(fullBottle)))
-    val mPack4 = MonadicPack(List(None, Some(fullBottle)))
-    val mCrate = MonadicCrate(List(Some(mPack3), Some(mPack4)))
+    // Exception style: null causes exceptions
+    val exPacks = List(
+      ExceptionPack(List(Bottle(), null, Bottle())),
+      ExceptionPack(List(null, Bottle()))
+    )
+    val exCrate = ExceptionCrate(exPacks)
+    val exCount = ExceptionStyle.countFullBottles(exCrate)
     
-    println("\nJava Style (null checks):")
-    val count1 = JavaStyle.countFullBottles(crate)
-    println(s"  Full bottles: $count1")
+    // Monad style: None for missing bottles
+    val monadPacks = List(
+      MonadStyle.Pack(List(Some(Bottle()): Option[Bottle], None, Some(Bottle()))),
+      MonadStyle.Pack(List(None: Option[Bottle], Some(Bottle())))
+    )
+    val monadCrate = MonadStyle.Crate(monadPacks)
+    val monadCount = MonadStyle.countFullBottles(monadCrate)
     
-    println("\nException Style:")
-    val count2 = ExceptionStyle.countFullBottles(crate)
-    println(s"  Full bottles: $count2")
-    
-    println("\nMonad Style:")
-    val count3 = MonadStyle.countFullBottles(mCrate)
-    println(s"  Full bottles: $count3")
+    println(s"  Java Style:      $javaCount full bottles")
+    println(s"  Exception Style: $exCount full bottles")
+    println(s"  Monad Style:     $monadCount full bottles")
   
-  /** Test with completely missing crate (null). */
-  def testNullCrate(): Unit =
-    println("\nJava Style (null checks):")
-    val count1 = JavaStyle.countFullBottles(null)
-    println(s"  Full bottles: $count1")
+  def testCase3(): Unit =
+    println("\n--- Test Case 3: Missing Packs ---")
     
-    println("\nException Style:")
-    val count2 = ExceptionStyle.countFullBottles(null)
-    println(s"  Full bottles: $count2")
+    // Java style: null for missing pack
+    val javaPacks = List(
+      JavaPack(List(Bottle(), Bottle())),
+      null,
+      JavaPack(List(Bottle()))
+    )
+    val javaCrate = JavaCrate(javaPacks)
+    val javaCount = JavaStyle.countFullBottles(javaCrate)
     
-    println("\nMonad Style:")
-    val mCrate = MonadicCrate[Bottle](List())  // Empty crate
-    val count3 = MonadStyle.countFullBottles(mCrate)
-    println(s"  Full bottles: $count3")
+    // Exception style: null causes exception
+    val exPacks = List(
+      ExceptionPack(List(Bottle(), Bottle())),
+      null,
+      ExceptionPack(List(Bottle()))
+    )
+    val exCrate = ExceptionCrate(exPacks)
+    val exCount = ExceptionStyle.countFullBottles(exCrate)
+    
+    // Monad style: empty pack for missing pack
+    val monadPacks = List(
+      MonadStyle.Pack(List(Some(Bottle()): Option[Bottle], Some(Bottle()))),
+      MonadStyle.Pack(List()),  // empty pack = no bottles
+      MonadStyle.Pack(List(Some(Bottle()): Option[Bottle]))
+    )
+    val monadCrate = MonadStyle.Crate(monadPacks)
+    val monadCount = MonadStyle.countFullBottles(monadCrate)
+    
+    println(s"  Java Style:      $javaCount full bottles")
+    println(s"  Exception Style: $exCount full bottles")
+    println(s"  Monad Style:     $monadCount full bottles")
+
