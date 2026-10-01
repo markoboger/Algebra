@@ -1,6 +1,18 @@
 # Monad Teaching Example
 
-Three approaches to the same navigation scenario: **Java-style** (nulls), **Exception-style** (throws/catches), and **Monad-style** (genuine container monads).
+Three approaches to the same aggregation scenario: **Java-style** (nulls), **Exception-style** (throws/catches), and **Monad-style** (genuine container monads).
+
+## Central Example: totalVolume
+
+**Task**: Sum the volume of all drinks across a crate of packs of bottles (some may be empty/missing).
+
+**Challenge**: Navigate multiple levels (Crate → Pack → Bottle → Drink) where any level can be missing/empty.
+
+### Three Approaches
+
+1. **Java-style**: Nested for-loops with null checks
+2. **Exception-style**: For-loops with exception-based bounds checking
+3. **Monad-style**: Single for-comprehension calling `Pack.flatMap` and `Crate.flatMap`
 
 ## Design
 
@@ -11,8 +23,8 @@ Three approaches to the same navigation scenario: **Java-style** (nulls), **Exce
 ## Run
 
 ```bash
-sbt run   # Demo: side-by-side comparison
-sbt test  # All tests pass (monad laws + equivalence)
+sbt "runMain monad.Demo"   # Demo: side-by-side comparison
+sbt test                    # All tests pass
 ```
 
 ## Tests
@@ -20,4 +32,4 @@ sbt test  # All tests pass (monad laws + equivalence)
 - **6 monad law properties** (ScalaCheck with generated functions):
   - Pack: left identity, right identity, associativity
   - Crate: left identity, right identity, associativity
-- **6 equivalence tests**: All three styles yield identical results on happy/missing/empty cases.
+- **5 equivalence tests**: All three styles yield identical results on happy path, empty bottles, missing packs, empty crate, and null bottles.

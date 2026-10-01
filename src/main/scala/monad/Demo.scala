@@ -1,51 +1,22 @@
 package monad
 
-/** Side-by-side demonstration of three approaches. */
+/** Side-by-side demonstration of three approaches to totalVolume. */
 object Demo:
   
   def main(args: Array[String]): Unit =
     println("=" * 70)
-    println("Monad Teaching Example: Three Approaches")
+    println("Monad Teaching Example: totalVolume Across Three Approaches")
     println("=" * 70)
     
-    testNavigation()
     testAggregate()
     demonstrateDomainMonads()
     
     println("\n" + "=" * 70)
     println("Summary:")
-    println("  Java:      Deep nesting, null checks at every level")
-    println("  Exception: Try-catch, model throws at boundaries")
+    println("  Java:      Nested loops, null checks at every level")
+    println("  Exception: Exception-based iteration control")
     println("  Monad:     For-comprehension, Pack.flatMap / Crate.flatMap")
     println("=" * 70)
-  
-  def testNavigation(): Unit =
-    println("\n--- Navigation: crate → pack(0) → bottle(1) → drink.name ---")
-    
-    val beer = Drink("Beer", 500)
-    val wine = Drink("Wine", 750)
-    
-    // Java style
-    val javaPack = JavaPack(Array(Bottle(Some(beer)), Bottle(Some(wine)), null))
-    val javaCrate = JavaCrate(Array(javaPack, null))
-    val javaResult = JavaStyle.getDrinkName(javaCrate, 0, 1)
-    
-    // Exception style
-    val exPack = ExceptionPack(Array(Bottle(Some(beer)), Bottle(Some(wine))))
-    val exCrate = ExceptionCrate(Array(exPack))
-    val exResult = ExceptionStyle.getDrinkName(exCrate, 0, 1)
-    
-    // Monad style
-    val monadPacks = Array(
-      Pack(List(Bottle(Some(beer)), Bottle(Some(wine)))),
-      Pack(List.empty)
-    )
-    val monadCrate = MonadicCrateOfPacks(monadPacks)
-    val monadResult = MonadStyle.getDrinkName(monadCrate, 0, 1)
-    
-    println(s"  Java Style:      $javaResult")
-    println(s"  Exception Style: $exResult")
-    println(s"  Monad Style:     $monadResult")
   
   def testAggregate(): Unit =
     println("\n--- Aggregate: Total Volume of All Full Bottles ---")
@@ -55,23 +26,21 @@ object Demo:
     val water = Drink("Water", 330)
     
     // Java style
-    val javaPack1 = JavaPack(Array(Bottle(Some(beer)), Bottle(Some(wine))))
-    val javaPack2 = JavaPack(Array(Bottle(None), Bottle(Some(water))))
-    val javaCrate = JavaCrate(Array(javaPack1, javaPack2))
+    val javaPack1 = JavaPack(List(Bottle(Some(beer)), Bottle(Some(wine))))
+    val javaPack2 = JavaPack(List(Bottle(None), Bottle(Some(water))))
+    val javaCrate = JavaCrate(List(javaPack1, javaPack2))
     val javaTotal = JavaStyle.totalVolume(javaCrate)
     
     // Exception style
-    val exPack1 = ExceptionPack(Array(Bottle(Some(beer)), Bottle(Some(wine))))
-    val exPack2 = ExceptionPack(Array(Bottle(None), Bottle(Some(water))))
-    val exCrate = ExceptionCrate(Array(exPack1, exPack2))
+    val exPack1 = ExceptionPack(List(Bottle(Some(beer)), Bottle(Some(wine))))
+    val exPack2 = ExceptionPack(List(Bottle(None), Bottle(Some(water))))
+    val exCrate = ExceptionCrate(List(exPack1, exPack2))
     val exTotal = ExceptionStyle.totalVolume(exCrate)
     
     // Monad style
-    val monadPacks = Array(
-      Pack(List(Bottle(Some(beer)), Bottle(Some(wine)))),
-      Pack(List(Bottle(None), Bottle(Some(water))))
-    )
-    val monadCrate = MonadicCrateOfPacks(monadPacks)
+    val monadPack1 = Pack(List(Bottle(Some(beer)), Bottle(Some(wine))))
+    val monadPack2 = Pack(List(Bottle(None), Bottle(Some(water))))
+    val monadCrate = Crate(List(monadPack1, monadPack2))
     val monadTotal = MonadStyle.totalVolume(monadCrate)
     
     println(s"  Java Style:      ${javaTotal}ml")

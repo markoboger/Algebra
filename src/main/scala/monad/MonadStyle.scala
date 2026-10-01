@@ -64,44 +64,19 @@ object Crate:
   def pure[A](a: A): Crate[A] = Crate(List(a))
   def empty[A]: Crate[A] = Crate(List.empty)
 
-/** Domain-specific crate containing packs of bottles.
- *
- * Provides indexed access for Java/Exception style compatibility.
- */
-case class MonadicCrateOfPacks(packs: Array[Pack[Bottle]]):
-  
-  def pack(index: Int): Option[Pack[Bottle]] =
-    if index >= 0 && index < packs.length then Some(packs(index)) else None
-  
-  /** Convert to a Crate[Pack[Bottle]] for monadic access. */
-  def toCrate: Crate[Pack[Bottle]] = Crate(packs.toList)
-
 object MonadStyle:
-  
-  /** Navigate: crate → pack(i) → bottle(j) → drink.name
-   *
-   * This version uses Option for indexed access (same scenario as Java/Exception styles).
-   */
-  def getDrinkName(crate: MonadicCrateOfPacks, packIdx: Int, bottleIdx: Int): Option[String] =
-    for
-      pack <- crate.pack(packIdx)
-      bottle <- if bottleIdx >= 0 && bottleIdx < pack.items.length 
-                then Some(pack.items(bottleIdx)) 
-                else None
-      drink <- bottle.content
-    yield drink.name
   
   /** Aggregate: total volume using genuine monad flatMap over Pack and Crate.
    *
    * Demonstrates for-comprehension calling Pack.flatMap and Crate.flatMap:
-   *   for pack <- crate.toCrate       desugars to Crate.flatMap
+   *   for pack <- crate       desugars to Crate.flatMap
    *       bottle <- pack.toCrate       desugars to Crate.flatMap
    *       drink <- Crate(...)          desugars to Crate.map
    *   yield drink.volumeMl
    */
-  def totalVolume(crate: MonadicCrateOfPacks): Int =
+  def totalVolume(crate: Crate[Pack[Bottle]]): Int =
     val result = for
-      pack <- crate.toCrate           // Crate[Pack[Bottle]].flatMap
+      pack <- crate                   // Crate[Pack[Bottle]].flatMap
       bottle <- pack.toCrate          // Crate[Bottle].flatMap (via Pack.toCrate)
       drink <- bottle.content match   // Crate[Drink].map
         case Some(d) => Crate.pure(d)
