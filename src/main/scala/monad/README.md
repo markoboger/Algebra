@@ -52,19 +52,38 @@ try
 Lawful monads (Pack, Crate) with Option for missing values.
 
 ```scala
-for
-  pack <- crate.packs
-  bottleOpt <- pack.bottles
-  bottle <- bottleOpt  // Option.flatMap
-  if bottle.full
-yield bottle
+case class Pack[T](bottles: List[T]):
+  def map[U](f: T => U): Pack[U] = Pack(bottles.map(f))
+  def flatMap[U](f: T => Pack[U]): Pack[U] = 
+    Pack(bottles.flatMap(b => f(b).bottles))
+  def withFilter(p: T => Boolean): Pack[T] = Pack(bottles.filter(p))
+  def foreach[U](f: T => U): Unit = bottles.foreach(f)
+
+case class Crate[T](packs: List[Pack[T]]):
+  def map[U](f: T => U): Crate[U] = Crate(packs.map(_.map(f)))
+  def flatMap[U](f: T => Pack[U]): Crate[U] = 
+    Crate(packs.map(_.flatMap(f)))
+  def withFilter(p: T => Boolean): Crate[T] = 
+    Crate(packs.map(_.withFilter(p)))
+  def foreach[U](f: T => U): Unit = packs.foreach(_.foreach(f))
+
+def countFullBottles(crate: Crate[Option[Bottle]]): Int =
+  var count = 0
+  for
+    bottleOpt <- crate         // Crate.foreach -> bottleOpt: Option[Bottle]
+    bottle <- bottleOpt        // Option.foreach -> bottle: Bottle
+    if bottle.full
+  do
+    count += 1
+  count
 ```
 
 **Characteristics:**
-- Pack and Crate are lawful monads (map/flatMap/withFilter)
-- For-comprehensions desugar to domain types' flatMap/map
-- Option[T] for possibly-missing elements
-- Flat, type-safe, composable
+- Pack[T] and Crate[T] are lawful monads (verified by tests)
+- For-comprehensions call **Crate.foreach** on our domain type
+- Option[T] for possibly-missing elements (type-safe)
+- Flat code, no nesting
+- Compiler-checked and refactorable (monad laws guarantee composition)
 
 ## Monad Laws
 
