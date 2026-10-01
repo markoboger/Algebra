@@ -1,0 +1,86 @@
+package monad
+
+/** Monad-style: Pack[A] and Crate[A] are genuine lawful container monads.
+ *
+ * Design note: Both Pack and Crate are independent sequence-like containers,
+ * each with lawful flatMap and unit. When nesting (Crate[Pack[Bottle]]),
+ * we use .toCrate to convert a Pack into a single-Pack Crate, enabling
+ * for pack <- crate; bottle <- pack.toCrate yield ... to call Crate.flatMap
+ * and Crate.map legitimately. This avoids the pitfall of re-chunking flatMap
+ * that breaks right identity.
+ */
+
+/** Pack[A]: a lawful monad container (sequence of items).
+ *
+ * Monad laws under structural equality (verified by ScalaCheck):
+ * 1. Left identity: Pack.pure(a).flatMap(f) == f(a)
+ * 2. Right identity: m.flatMap(Pack.pure) == m
+ * 3. Associativity: m.flatMap(f).flatMap(g) == m.flatMap(x => f(x).flatMap(g))
+ */
+case class Pack[A](items: List[A]):
+  
+  def map[B](f: A => B): Pack[B] =
+    Pack(items.map(f))
+  
+  def flatMap[B](f: A => Pack[B]): Pack[B] =
+    Pack(items.flatMap(a => f(a).items))
+  
+  def withFilter(p: A => Boolean): Pack[A] =
+    Pack(items.filter(p))
+  
+  def isEmpty: Boolean = items.isEmpty
+  
+  /** Convert this Pack's items into a Crate. */
+  def toCrate: Crate[A] = Crate(items)
+
+object Pack:
+  def pure[A](a: A): Pack[A] = Pack(List(a))
+  def empty[A]: Pack[A] = Pack(List.empty)
+
+/** Crate[A]: a lawful monad container (sequence of items, conceptually).
+ *
+ * Monad laws under structural equality (verified by ScalaCheck):
+ * 1. Left identity: Crate.pure(a).flatMap(f) == f(a)
+ * 2. Right identity: m.flatMap(Crate.pure) == m
+ * 3. Associativity: m.flatMap(f).flatMap(g) == m.flatMap(x => f(x).flatMap(g))
+ *
+ * Internally represented as List[A] to ensure lawfulness; not List[Pack[A]]
+ * to avoid re-chunking issues that break right identity.
+ */
+case class Crate[A](items: List[A]):
+  
+  def map[B](f: A => B): Crate[B] =
+    Crate(items.map(f))
+  
+  def flatMap[B](f: A => Crate[B]): Crate[B] =
+    Crate(items.flatMap(a => f(a).items))
+  
+  def withFilter(p: A => Boolean): Crate[A] =
+    Crate(items.filter(p))
+  
+  def isEmpty: Boolean = items.isEmpty
+
+object Crate:
+  def pure[A](a: A): Crate[A] = Crate(List(a))
+  def empty[A]: Crate[A] = Crate(List.empty)
+
+object MonadStyle:
+  
+  /** Aggregate: total volume using genuine monad flatMap over Pack and Crate.
+   *
+   * Demonstrates for-comprehension calling Pack.flatMap and Crate.flatMap:
+   *   for pack <- crate       desugars to Crate.flatMap
+   *       bottle <- pack.toCrate       desugars to Crate.flatMap
+   *       drink <- Crate(...)          desugars to Crate.map
+   *   yield drink.volumeMl
+   */
+  def totalVolume(crate: Crate[Pack[Bottle]]): Int =
+    val result = for
+      pack <- crate                   // Crate[Pack[Bottle]].flatMap
+      bottle <- pack.toCrate          // Crate[Bottle].flatMap (via Pack.toCrate)
+      drink <- bottle.content match   // Crate[Drink].map
+        case Some(d) => Crate.pure(d)
+        case None => Crate.empty
+    yield drink.volumeMl
+    
+    result.items.sum

@@ -4,3 +4,5 @@ version := "0.1.0-SNAPSHOT"
 
 // Add project dependencies here
 libraryDependencies += "org.typelevel" %% "spire" % "0.18.0"
+libraryDependencies += "org.scalameta" %% "munit" % "1.0.0" % Test
+libraryDependencies += "org.scalameta" %% "munit-scalacheck" % "1.0.0" % Test
