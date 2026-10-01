@@ -1,25 +1,26 @@
 package monad
 
-/** Java-style: null-based accessors, deep defensive checks. */
+/** Java-style: pure null-based model. */
 
-class JavaPack(bottles: List[Bottle | Null]):
-  def allBottles: List[Bottle | Null] = bottles
+case class JavaBottle(drink: Drink | Null)
 
-class JavaCrate(packs: List[JavaPack | Null]):
-  def allPacks: List[JavaPack | Null] = packs
+class JavaPack(val bottles: List[JavaBottle]):
+  def isEmpty: Boolean = bottles.isEmpty
+
+class JavaCrate(val packs: List[JavaPack]):
+  def isEmpty: Boolean = packs.isEmpty
 
 object JavaStyle:
   
   /** Aggregate: total volume of all full bottles.
    *
-   * Nested for-loops with null checks at every level.
+   * Nested for-loops with null checks.
    */
-  def totalVolume(crate: JavaCrate | Null): Int =
+  def totalVolume(crate: JavaCrate): Int =
     var total = 0
-    if crate != null then
-      for pack <- crate.allPacks do
-        if pack != null then
-          for bottle <- pack.allBottles do
-            if bottle != null && bottle.content.isDefined then
-              total += bottle.content.get.volumeMl
+    for pack <- crate.packs do
+      for bottle <- pack.bottles do
+        val drink = bottle.drink
+        if drink != null then
+          total += drink.volumeMl
     total

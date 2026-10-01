@@ -1,50 +1,36 @@
 package monad
 
-/** Exception-style: model throws domain exceptions, client catches at outer scope. */
+/** Exception-style: model throws for missing elements. */
 
-class NoSuchPackException extends Exception("Pack not found")
-class NoSuchBottleException extends Exception("Bottle not found")
+class EmptyBottleException extends Exception("Bottle is empty")
 
-class ExceptionPack(bottles: List[Bottle]):
-  
-  /** Throws NoSuchBottleException if index out of bounds. */
-  def bottle(index: Int): Bottle =
-    if index >= 0 && index < bottles.length then bottles(index)
-    else throw NoSuchBottleException()
-  
-  def size: Int = bottles.length
+case class ExceptionBottle(private val drinkOpt: Option[Drink]):
+  /** Throws EmptyBottleException if bottle is empty. */
+  def drink: Drink = drinkOpt match
+    case Some(d) => d
+    case None => throw EmptyBottleException()
 
-class ExceptionCrate(packs: List[ExceptionPack]):
-  
-  /** Throws NoSuchPackException if index out of bounds. */
-  def pack(index: Int): ExceptionPack =
-    if index >= 0 && index < packs.length then packs(index)
-    else throw NoSuchPackException()
-  
-  def size: Int = packs.length
+class ExceptionPack(val bottles: List[ExceptionBottle]):
+  def isEmpty: Boolean = bottles.isEmpty
+
+class ExceptionCrate(val packs: List[ExceptionPack]):
+  def isEmpty: Boolean = packs.isEmpty
 
 object ExceptionStyle:
   
-  /** Aggregate: total volume with exception-based iteration control.
+  /** Aggregate: total volume with exceptions for empty bottles.
    *
-   * Uses for-loops with index ranges; exceptions signal out-of-bounds.
+   * Model throws, client catches at outer scope.
    */
   def totalVolume(crate: ExceptionCrate): Int =
     var total = 0
     
-    try
-      for packIdx <- 0 until Int.MaxValue do
-        val pack = crate.pack(packIdx)         // throws when no more packs
-        
+    for pack <- crate.packs do
+      for bottle <- pack.bottles do
         try
-          for bottleIdx <- 0 until Int.MaxValue do
-            val bottle = pack.bottle(bottleIdx) // throws when no more bottles
-            bottle.content match
-              case Some(drink) => total += drink.volumeMl
-              case None => ()
+          val drink = bottle.drink  // may throw EmptyBottleException
+          total += drink.volumeMl
         catch
-          case _: NoSuchBottleException => ()   // natural loop termination
-    catch
-      case _: NoSuchPackException => ()         // natural loop termination
+          case _: EmptyBottleException => ()  // skip empty bottles
     
     total

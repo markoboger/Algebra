@@ -4,21 +4,22 @@ Three approaches to the same aggregation scenario: **Java-style** (nulls), **Exc
 
 ## Central Example: totalVolume
 
-**Task**: Sum the volume of all drinks across a crate of packs of bottles (some may be empty/missing).
+**Task**: Sum the volume of all drinks across a crate of packs of bottles (some may be empty).
 
-**Challenge**: Navigate multiple levels (Crate → Pack → Bottle → Drink) where any level can be missing/empty.
+**Challenge**: Navigate multiple levels (Crate → Pack → Bottle → Drink) where bottles can be empty.
 
 ### Three Approaches
 
-1. **Java-style**: Nested for-loops with null checks
-2. **Exception-style**: For-loops with exception-based bounds checking
-3. **Monad-style**: Single for-comprehension calling `Pack.flatMap` and `Crate.flatMap`
+Each style uses its own idiomatic bottle type:
+1. **Java-style**: `JavaBottle(drink: Drink | Null)` — nested for-loops with null checks
+2. **Exception-style**: `ExceptionBottle` with accessor that throws `EmptyBottleException` — model throws, client catches
+3. **Monad-style**: `MonadBottle(content: Option[Drink])` — for-comprehension calling `Crate.flatMap` with `Crate.fromOption`
 
 ## Design
 
 **Pack[A]** and **Crate[A]** are lawful monad containers (like List). Both have `flatMap` and `pure` (unit), satisfying monad laws under structural equality.
 
-**Key point**: For-comprehensions call `Pack.flatMap` and `Crate.flatMap`, not List or Option. When nesting (`Crate[Pack[Bottle]]`), we use `.toCrate` conversion to enable `for pack <- crate; bottle <- pack.toCrate yield ...` calling `Crate.flatMap` legitimately.
+**Key point**: The for-comprehension calls `Crate.flatMap` throughout (via `pack.toCrate` conversion). The last generator before `yield` desugars to `map`.
 
 ## Run
 
@@ -32,4 +33,12 @@ sbt test                    # All tests pass
 - **6 monad law properties** (ScalaCheck with generated functions):
   - Pack: left identity, right identity, associativity
   - Crate: left identity, right identity, associativity
-- **5 equivalence tests**: All three styles yield identical results on happy path, empty bottles, missing packs, empty crate, and null bottles.
+- **4 equivalence tests**: All three styles yield identical results (happy path, all empty bottles, pack with no bottles, empty crate)
+
+## Comparison
+
+| Aspect | Java | Exception | Monad |
+|--------|------|-----------|-------|
+| **Empty bottle** | null drink | throws `EmptyBottleException` | `None` |
+| **Control flow** | Nested for-loops | For-loops + try/catch | Single for-comprehension |
+| **Composition** | Manual null checks | Model throws, client catches | Automatic (flatMap) |
