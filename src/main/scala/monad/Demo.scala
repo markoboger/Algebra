@@ -13,9 +13,9 @@ object Demo:
     
     println("\n" + "=" * 70)
     println("Summary:")
-    println("  Java:      Nested for-loops, null checks at every level")
-    println("  Exception: For-loops, exceptions for empty bottles")
-    println("  Monad:     For-comprehension, Crate.flatMap throughout")
+    println("  Java:      Nested for-loops, null checks")
+    println("  Exception: For-loops, model throws / client catches")
+    println("  Monad:     For-comprehension, Crate.flatMap with Option")
     println("=" * 70)
   
   def testAggregate(): Unit =
@@ -25,21 +25,21 @@ object Demo:
     val wine = Drink("Wine", 750)
     val water = Drink("Water", 330)
     
-    // Java style
-    val javaPack1 = JavaPack(List(Bottle(beer), Bottle(wine)))
-    val javaPack2 = JavaPack(List(Bottle(null), Bottle(water)))
+    // Java style: null for empty bottles
+    val javaPack1 = JavaPack(List(JavaBottle(beer), JavaBottle(wine)))
+    val javaPack2 = JavaPack(List(JavaBottle(null), JavaBottle(water)))
     val javaCrate = JavaCrate(List(javaPack1, javaPack2))
     val javaTotal = JavaStyle.totalVolume(javaCrate)
     
-    // Exception style
-    val exPack1 = ExceptionPack(List(Bottle(beer), Bottle(wine)))
-    val exPack2 = ExceptionPack(List(Bottle(null), Bottle(water)))
+    // Exception style: throws for empty bottles
+    val exPack1 = ExceptionPack(List(ExceptionBottle(Some(beer)), ExceptionBottle(Some(wine))))
+    val exPack2 = ExceptionPack(List(ExceptionBottle(None), ExceptionBottle(Some(water))))
     val exCrate = ExceptionCrate(List(exPack1, exPack2))
     val exTotal = ExceptionStyle.totalVolume(exCrate)
     
-    // Monad style
-    val monadPack1 = Pack(List(Bottle(beer), Bottle(wine)))
-    val monadPack2 = Pack(List(Bottle(null), Bottle(water)))
+    // Monad style: Option for empty bottles
+    val monadPack1 = Pack(List(MonadBottle(Some(beer)), MonadBottle(Some(wine))))
+    val monadPack2 = Pack(List(MonadBottle(None), MonadBottle(Some(water))))
     val monadCrate = Crate(List(monadPack1, monadPack2))
     val monadTotal = MonadStyle.totalVolume(monadCrate)
     
@@ -76,15 +76,13 @@ object Demo:
     // For-comprehension calling Crate.flatMap (nested scenario)
     val beer = Drink("Beer", 500)
     val wine = Drink("Wine", 750)
-    val bottlePack = Pack(List(Bottle(beer), Bottle(null)))
-    val crateOfPacks = Crate(List(bottlePack, Pack(List(Bottle(wine)))))
+    val bottlePack = Pack(List(MonadBottle(Some(beer)), MonadBottle(None)))
+    val crateOfPacks = Crate(List(bottlePack, Pack(List(MonadBottle(Some(wine))))))
     
     val volumes = for
-      pack <- crateOfPacks            // Crate.flatMap
-      bottle <- pack.toCrate          // Crate.flatMap (Pack converted to Crate)
-      drink <- bottle.drink match
-        case d: Drink => Crate.pure(d)
-        case null => Crate.empty
+      pack <- crateOfPacks                      // Crate.flatMap
+      bottle <- pack.toCrate                    // Crate.flatMap
+      drink <- Crate.fromOption(bottle.content) // Crate.map
     yield drink.volumeMl
     
     println(s"  Crate for-comprehension: volumes = ${volumes.items}")

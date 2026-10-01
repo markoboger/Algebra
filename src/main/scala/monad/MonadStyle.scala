@@ -62,24 +62,30 @@ case class Crate[A](items: List[A]):
 object Crate:
   def pure[A](a: A): Crate[A] = Crate(List(a))
   def empty[A]: Crate[A] = Crate(List.empty)
+  
+  /** Convert Option to Crate (Some → pure, None → empty). */
+  def fromOption[A](opt: Option[A]): Crate[A] = opt match
+    case Some(a) => pure(a)
+    case None => empty
+
+/** Monad-style bottle with Option. */
+case class MonadBottle(content: Option[Drink])
 
 object MonadStyle:
   
   /** Aggregate: total volume using genuine monad flatMap over Crate.
    *
    * Demonstrates for-comprehension calling Crate.flatMap throughout:
-   *   for pack <- crate                desugars to Crate.flatMap
-   *       bottle <- pack.toCrate       desugars to Crate.flatMap
-   *       drink <- (match expression)  desugars to Crate.map (last generator)
+   *   for pack <- crate                    desugars to Crate.flatMap
+   *       bottle <- pack.toCrate           desugars to Crate.flatMap
+   *       drink <- Crate.fromOption(...)   desugars to Crate.map (last generator)
    *   yield drink.volumeMl
    */
-  def totalVolume(crate: Crate[Pack[Bottle]]): Int =
+  def totalVolume(crate: Crate[Pack[MonadBottle]]): Int =
     val result = for
-      pack <- crate                   // Crate[Pack[Bottle]].flatMap
-      bottle <- pack.toCrate          // Crate[Bottle].flatMap (via Pack.toCrate)
-      drink <- bottle.drink match     // Crate[Drink].map (map because it's the last generator before yield)
-        case d: Drink => Crate.pure(d)
-        case null => Crate.empty
+      pack <- crate                         // Crate[Pack[MonadBottle]].flatMap
+      bottle <- pack.toCrate                // Crate[MonadBottle].flatMap (via Pack.toCrate)
+      drink <- Crate.fromOption(bottle.content)  // Crate[Drink].map (map because last generator)
     yield drink.volumeMl
     
     result.items.sum
