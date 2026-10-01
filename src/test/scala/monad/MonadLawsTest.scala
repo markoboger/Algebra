@@ -2,101 +2,64 @@ package monad
 
 import munit.ScalaCheckSuite
 import org.scalacheck.Prop.*
-import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.{Arbitrary, Gen, Cogen}
 
-/** Property-based tests for monad laws with ScalaCheck. */
+/** Property-based tests for monad laws using ScalaCheck with generated functions. */
 class MonadLawsTest extends ScalaCheckSuite:
   
-  // Generators
+  // Generators for Pack and Crate
   implicit val arbPack: Arbitrary[Pack[Int]] = Arbitrary(
     Gen.listOf(Gen.choose(1, 100)).map(Pack(_))
   )
   
   implicit val arbCrate: Arbitrary[Crate[Int]] = Arbitrary(
-    Gen.listOf(arbPack.arbitrary).map(Crate(_))
+    Gen.listOf(Gen.choose(1, 100)).map(Crate(_))
   )
   
-  implicit val arbMaybe: Arbitrary[Maybe[Int]] = Arbitrary(
-    Gen.oneOf(
-      Gen.const(Empty),
-      Gen.choose(1, 100).map(Just(_))
-    )
+  // Cogen instances for generating functions
+  implicit val cogenPack: Cogen[Pack[Int]] = Cogen[List[Int]].contramap(_.items)
+  implicit val cogenCrate: Cogen[Crate[Int]] = Cogen[List[Int]].contramap(_.items)
+  
+  // Generator for functions Int => Pack[Int]
+  implicit val arbIntToPack: Arbitrary[Int => Pack[Int]] = Arbitrary(
+    Gen.function1[Int, Pack[Int]](arbPack.arbitrary)(Cogen[Int])
   )
   
-  // Pack[T] monad laws
+  // Generator for functions Int => Crate[Int]
+  implicit val arbIntToCrate: Arbitrary[Int => Crate[Int]] = Arbitrary(
+    Gen.function1[Int, Crate[Int]](arbCrate.arbitrary)(Cogen[Int])
+  )
   
-  property("Pack left identity"):
-    forAll { (n: Int) =>
-      val f = (x: Int) => Pack(List(x, x * 2))
-      Pack.pure(n).flatMap(f) == f(n)
+  // ===== Pack[T] Monad Laws =====
+  
+  property("Pack: left identity"):
+    forAll { (a: Int, f: Int => Pack[Int]) =>
+      Pack.pure(a).flatMap(f) == f(a)
     }
   
-  property("Pack right identity"):
-    forAll { (pack: Pack[Int]) =>
-      pack.flatMap(Pack.pure) == pack
+  property("Pack: right identity"):
+    forAll { (m: Pack[Int]) =>
+      m.flatMap(Pack.pure) == m
     }
   
-  property("Pack associativity"):
-    forAll { (pack: Pack[Int]) =>
-      val f = (x: Int) => Pack(List(x, x + 1))
-      val g = (x: Int) => Pack(List(x * 2))
-      pack.flatMap(f).flatMap(g) == pack.flatMap(x => f(x).flatMap(g))
-    }
-  
-  property("Pack functor identity"):
-    forAll { (pack: Pack[Int]) =>
-      pack.map(identity) == pack
-    }
-  
-  property("Pack functor composition"):
-    forAll { (pack: Pack[Int]) =>
-      val f = (x: Int) => x * 2
-      val g = (x: Int) => x + 1
-      pack.map(x => f(g(x))) == pack.map(g).map(f)
-    }
-  
-  // Crate[T] functor laws (Crate is a functor, not a monad)
-  
-  property("Crate functor identity"):
-    forAll { (crate: Crate[Int]) =>
-      crate.map(identity) == crate
-    }
-  
-  property("Crate functor composition"):
-    forAll { (crate: Crate[Int]) =>
-      val f = (x: Int) => x * 2
-      val g = (x: Int) => x + 1
-      crate.map(x => f(g(x))) == crate.map(g).map(f)
-    }
-  
-  // Maybe[T] monad laws
-  
-  property("Maybe left identity"):
-    forAll { (n: Int) =>
-      val f = (x: Int) => if x % 2 == 0 then Just(x) else Empty
-      Maybe.pure(n).flatMap(f) == f(n)
-    }
-  
-  property("Maybe right identity"):
-    forAll { (m: Maybe[Int]) =>
-      m.flatMap(Maybe.pure) == m
-    }
-  
-  property("Maybe associativity"):
-    forAll { (m: Maybe[Int]) =>
-      val f = (x: Int) => if x > 50 then Just(x) else Empty
-      val g = (x: Int) => Just(x * 2)
+  property("Pack: associativity"):
+    forAll { (m: Pack[Int], f: Int => Pack[Int], g: Int => Pack[Int]) =>
       m.flatMap(f).flatMap(g) == m.flatMap(x => f(x).flatMap(g))
     }
   
-  property("Maybe functor identity"):
-    forAll { (m: Maybe[Int]) =>
-      m.map(identity) == m
+  // ===== Crate[T] Monad Laws =====
+  
+  property("Crate: left identity"):
+    forAll { (a: Int, f: Int => Crate[Int]) =>
+      Crate.pure(a).flatMap(f) == f(a)
     }
   
-  property("Maybe functor composition"):
-    forAll { (m: Maybe[Int]) =>
-      val f = (x: Int) => x * 2
-      val g = (x: Int) => x + 1
-      m.map(x => f(g(x))) == m.map(g).map(f)
+  property("Crate: right identity"):
+    forAll { (m: Crate[Int]) =>
+      m.flatMap(Crate.pure) == m
+    }
+  
+  property("Crate: associativity"):
+    forAll { (m: Crate[Int], f: Int => Crate[Int], g: Int => Crate[Int]) =>
+      m.flatMap(f).flatMap(g) == m.flatMap(x => f(x).flatMap(g))
     }

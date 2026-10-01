@@ -1,18 +1,16 @@
 package monad
 
-/** Java-style: accessors return null, deep nesting of null checks.
- *
- * Scenario: Navigate crate → pack(i) → bottle(j) → drink.name
- * Each step can be null, requiring defensive checks at every level.
- */
+/** Java-style: null-based accessors, deep defensive checks. */
 
 class JavaCrate(packs: Array[JavaPack | Null]):
+  
   def pack(index: Int): JavaPack | Null =
     if index >= 0 && index < packs.length then packs(index) else null
   
   def allPacks: Array[JavaPack | Null] = packs
 
 class JavaPack(bottles: Array[Bottle | Null]):
+  
   def bottle(index: Int): Bottle | Null =
     if index >= 0 && index < bottles.length then bottles(index) else null
   
@@ -22,7 +20,7 @@ object JavaStyle:
   
   /** Navigate: crate → pack(i) → bottle(j) → drink.name
    *
-   * Five levels of nesting to reach the drink name.
+   * Deep nesting with null checks at every level.
    */
   def getDrinkName(crate: JavaCrate | Null, packIdx: Int, bottleIdx: Int): String | Null =
     if crate != null then
@@ -32,8 +30,7 @@ object JavaStyle:
         if bottle != null then
           val content = bottle.content
           if content.isDefined then
-            val drink = content.get
-            drink.name
+            content.get.name
           else null
         else null
       else null

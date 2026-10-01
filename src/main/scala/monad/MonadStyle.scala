@@ -1,167 +1,111 @@
 package monad
 
-/** Monad-style: accessors return Option, composition via for-comprehension.
+/** Monad-style: Pack[A] and Crate[A] are genuine lawful container monads.
  *
- * Part A: Navigation using Option.flatMap/map
- * Part B: Custom domain monads Pack[T] and Crate[T]
- * Part C: Teaching Maybe[T] monad
+ * Design note: Both Pack and Crate are independent sequence-like containers,
+ * each with lawful flatMap and unit. When nesting (Crate[Pack[Bottle]]),
+ * we use .toCrate to convert a Pack into a single-Pack Crate, enabling
+ * for pack <- crate; bottle <- pack.toCrate yield ... to call Crate.flatMap
+ * and Crate.map legitimately. This avoids the pitfall of re-chunking flatMap
+ * that breaks right identity.
  */
 
-// ===== Part A: Navigation with Option =====
+/** Pack[A]: a lawful monad container (sequence of items).
+ *
+ * Monad laws under structural equality (verified by ScalaCheck):
+ * 1. Left identity: Pack.pure(a).flatMap(f) == f(a)
+ * 2. Right identity: m.flatMap(Pack.pure) == m
+ * 3. Associativity: m.flatMap(f).flatMap(g) == m.flatMap(x => f(x).flatMap(g))
+ */
+case class Pack[A](items: List[A]):
+  
+  def map[B](f: A => B): Pack[B] =
+    Pack(items.map(f))
+  
+  def flatMap[B](f: A => Pack[B]): Pack[B] =
+    Pack(items.flatMap(a => f(a).items))
+  
+  def withFilter(p: A => Boolean): Pack[A] =
+    Pack(items.filter(p))
+  
+  def isEmpty: Boolean = items.isEmpty
+  
+  /** Convert this Pack's items into a Crate. */
+  def toCrate: Crate[A] = Crate(items)
 
-class MonadicCrate(packs: Array[MonadicPack]):
-  def pack(index: Int): Option[MonadicPack] =
+object Pack:
+  def pure[A](a: A): Pack[A] = Pack(List(a))
+  def empty[A]: Pack[A] = Pack(List.empty)
+
+/** Crate[A]: a lawful monad container (sequence of items, conceptually).
+ *
+ * Monad laws under structural equality (verified by ScalaCheck):
+ * 1. Left identity: Crate.pure(a).flatMap(f) == f(a)
+ * 2. Right identity: m.flatMap(Crate.pure) == m
+ * 3. Associativity: m.flatMap(f).flatMap(g) == m.flatMap(x => f(x).flatMap(g))
+ *
+ * Internally represented as List[A] to ensure lawfulness; not List[Pack[A]]
+ * to avoid re-chunking issues that break right identity.
+ */
+case class Crate[A](items: List[A]):
+  
+  def map[B](f: A => B): Crate[B] =
+    Crate(items.map(f))
+  
+  def flatMap[B](f: A => Crate[B]): Crate[B] =
+    Crate(items.flatMap(a => f(a).items))
+  
+  def withFilter(p: A => Boolean): Crate[A] =
+    Crate(items.filter(p))
+  
+  def isEmpty: Boolean = items.isEmpty
+
+object Crate:
+  def pure[A](a: A): Crate[A] = Crate(List(a))
+  def empty[A]: Crate[A] = Crate(List.empty)
+
+/** Domain-specific crate containing packs of bottles.
+ *
+ * Provides indexed access for Java/Exception style compatibility.
+ */
+case class MonadicCrateOfPacks(packs: Array[Pack[Bottle]]):
+  
+  def pack(index: Int): Option[Pack[Bottle]] =
     if index >= 0 && index < packs.length then Some(packs(index)) else None
   
-  def allPacks: List[MonadicPack] = packs.toList
-
-class MonadicPack(bottles: Array[Bottle]):
-  def bottle(index: Int): Option[Bottle] =
-    if index >= 0 && index < bottles.length then Some(bottles(index)) else None
-  
-  def allBottles: List[Bottle] = bottles.toList
+  /** Convert to a Crate[Pack[Bottle]] for monadic access. */
+  def toCrate: Crate[Pack[Bottle]] = Crate(packs.toList)
 
 object MonadStyle:
   
   /** Navigate: crate → pack(i) → bottle(j) → drink.name
    *
-   * Single for-comprehension desugars to Option.flatMap/map:
-   *   crate.pack(packIdx).flatMap { pack =>
-   *     pack.bottle(bottleIdx).flatMap { bottle =>
-   *       bottle.content.map { drink =>
-   *         drink.name
-   *       }
-   *     }
-   *   }
-   *
-   * This calls Option.flatMap and Option.map, demonstrating monadic composition.
+   * This version uses Option for indexed access (same scenario as Java/Exception styles).
    */
-  def getDrinkName(crate: MonadicCrate, packIdx: Int, bottleIdx: Int): Option[String] =
+  def getDrinkName(crate: MonadicCrateOfPacks, packIdx: Int, bottleIdx: Int): Option[String] =
     for
-      pack <- crate.pack(packIdx)       // Option.flatMap
-      bottle <- pack.bottle(bottleIdx)  // Option.flatMap
-      drink <- bottle.content           // Option.map
+      pack <- crate.pack(packIdx)
+      bottle <- if bottleIdx >= 0 && bottleIdx < pack.items.length 
+                then Some(pack.items(bottleIdx)) 
+                else None
+      drink <- bottle.content
     yield drink.name
   
-  /** Aggregate: total volume using flatMap over collections and Options.
+  /** Aggregate: total volume using genuine monad flatMap over Pack and Crate.
    *
-   * Scales naturally: flatMap over packs, flatMap over bottles, flatMap over content.
+   * Demonstrates for-comprehension calling Pack.flatMap and Crate.flatMap:
+   *   for pack <- crate.toCrate       desugars to Crate.flatMap
+   *       bottle <- pack.toCrate       desugars to Crate.flatMap
+   *       drink <- Crate(...)          desugars to Crate.map
+   *   yield drink.volumeMl
    */
-  def totalVolume(crate: MonadicCrate): Int =
-    crate.allPacks
-      .flatMap(_.allBottles)           // List.flatMap
-      .flatMap(_.content)              // List.flatMap over Option content
-      .map(_.volumeMl)                 // List.map
-      .sum
-
-// ===== Part B: Custom Domain Monads =====
-
-/** Pack[T] is a lawful monad (container of items).
- *
- * Monad laws verified by tests with structural equality:
- * 1. Left identity: Pack.pure(a).flatMap(f) ≡ f(a)
- * 2. Right identity: m.flatMap(Pack.pure) ≡ m
- * 3. Associativity: m.flatMap(f).flatMap(g) ≡ m.flatMap(x => f(x).flatMap(g))
- */
-case class Pack[T](items: List[T]):
-  
-  def map[U](f: T => U): Pack[U] =
-    Pack(items.map(f))
-  
-  /** FlatMap: for x <- pack; y <- f(x) yield ...
-   *
-   * Stays within Pack: f returns Pack[U], result is Pack[U].
-   */
-  def flatMap[U](f: T => Pack[U]): Pack[U] =
-    Pack(items.flatMap(t => f(t).items))
-  
-  def withFilter(p: T => Boolean): Pack[T] =
-    Pack(items.filter(p))
-  
-  def foreach[U](f: T => U): Unit =
-    items.foreach(f)
-
-object Pack:
-  def pure[T](value: T): Pack[T] = Pack(List(value))
-
-/** Crate[T] is a functor (not a full monad).
- *
- * It has map but not a lawful monad flatMap. A monad would require
- * flatMap[U](f: T => Crate[U]): Crate[U], but our domain doesn't
- * support that semantics cleanly.
- *
- * Instead, we provide:
- * - map: transform all items
- * - flatten: extract all items into a single Pack
- * - bottles: extract all items as a List
- */
-case class Crate[T](packs: List[Pack[T]]):
-  
-  def map[U](f: T => U): Crate[U] =
-    Crate(packs.map(_.map(f)))
-  
-  /** Extract all items from all packs as a List. */
-  def bottles: List[T] =
-    packs.flatMap(_.items)
-  
-  /** Extract all items from all packs as a single Pack. */
-  def flatten: Pack[T] =
-    Pack(packs.flatMap(_.items))
-
-object Crate:
-  /** Lift a pack into a crate. */
-  def apply[T](pack: Pack[T]): Crate[T] = Crate(List(pack))
-
-// ===== Part C: Teaching Maybe Monad =====
-
-/** Maybe[T]: a teaching monad (doesn't shadow stdlib).
- *
- * Laws identical to Option, verified by tests.
- */
-sealed trait Maybe[+T]:
-  def map[U](f: T => U): Maybe[U] = this match
-    case Just(value) => Just(f(value))
-    case Empty => Empty
-  
-  def flatMap[U](f: T => Maybe[U]): Maybe[U] = this match
-    case Just(value) => f(value)
-    case Empty => Empty
-  
-  def withFilter(p: T => Boolean): Maybe[T] = this match
-    case Just(value) if p(value) => this
-    case _ => Empty
-
-case class Just[T](value: T) extends Maybe[T]
-case object Empty extends Maybe[Nothing]
-
-object Maybe:
-  def pure[T](value: T): Maybe[T] = Just(value)
-  
-  /** Convert Option to Maybe. */
-  extension [T](opt: Option[T])
-    def toMaybe: Maybe[T] = opt match
-      case Some(value) => Just(value)
-      case None => Empty
-  
-  /** Demonstrate: navigation using Maybe (mirror of Option version).
-   *
-   * Desugars to:
-   *   crateOpt.toMaybe.flatMap { crate =>
-   *     crate.pack(packIdx).toMaybe.flatMap { pack =>
-   *       pack.bottle(bottleIdx).toMaybe.flatMap { bottle =>
-   *         bottle.content.toMaybe.map(_.name)
-   *       }
-   *     }
-   *   }
-   */
-  def navigateWithMaybe(
-    crateOpt: Option[MonadicCrate],
-    packIdx: Int,
-    bottleIdx: Int
-  ): Maybe[String] =
-    for
-      crate <- crateOpt.toMaybe           // Maybe.flatMap
-      pack <- crate.pack(packIdx).toMaybe  // Maybe.flatMap
-      bottle <- pack.bottle(bottleIdx).toMaybe // Maybe.flatMap
-      drink <- bottle.content.toMaybe     // Maybe.map
-    yield drink.name
+  def totalVolume(crate: MonadicCrateOfPacks): Int =
+    val result = for
+      pack <- crate.toCrate           // Crate[Pack[Bottle]].flatMap
+      bottle <- pack.toCrate          // Crate[Bottle].flatMap (via Pack.toCrate)
+      drink <- bottle.content match   // Crate[Drink].map
+        case Some(d) => Crate.pure(d)
+        case None => Crate.empty
+    yield drink.volumeMl
+    
+    result.items.sum

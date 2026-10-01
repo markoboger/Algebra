@@ -3,7 +3,7 @@ package monad
 import munit.FunSuite
 
 /** Tests proving all three navigation styles produce identical results. */
-class NavigationEquivalenceTest extends FunSuite:
+class EquivalenceTest extends FunSuite:
   
   val beer = Drink("Beer", 500)
   val wine = Drink("Wine", 750)
@@ -21,8 +21,8 @@ class NavigationEquivalenceTest extends FunSuite:
     val exResult = ExceptionStyle.getDrinkName(exCrate, 0, 1)
     
     // Monad
-    val monadPack = MonadicPack(Array(Bottle(Some(beer)), Bottle(Some(wine))))
-    val monadCrate = MonadicCrate(Array(monadPack))
+    val monadPack = Pack(List(Bottle(Some(beer)), Bottle(Some(wine))))
+    val monadCrate = MonadicCrateOfPacks(Array(monadPack))
     val monadResult = MonadStyle.getDrinkName(monadCrate, 0, 1)
     
     assertEquals(javaResult, "Wine")
@@ -39,7 +39,7 @@ class NavigationEquivalenceTest extends FunSuite:
     val exResult = ExceptionStyle.getDrinkName(exCrate, 0, 0)
     
     // Monad
-    val monadCrate = MonadicCrate(Array())
+    val monadCrate = MonadicCrateOfPacks(Array())
     val monadResult = MonadStyle.getDrinkName(monadCrate, 0, 0)
     
     assertEquals(javaResult, null)
@@ -50,7 +50,7 @@ class NavigationEquivalenceTest extends FunSuite:
     // Java
     val javaPack = JavaPack(Array(Bottle(Some(beer))))
     val javaCrate = JavaCrate(Array(javaPack))
-    val javaResult = JavaStyle.getDrinkName(javaCrate, 0, 5) // out of bounds
+    val javaResult = JavaStyle.getDrinkName(javaCrate, 0, 5)
     
     // Exception
     val exPack = ExceptionPack(Array(Bottle(Some(beer))))
@@ -58,8 +58,8 @@ class NavigationEquivalenceTest extends FunSuite:
     val exResult = ExceptionStyle.getDrinkName(exCrate, 0, 5)
     
     // Monad
-    val monadPack = MonadicPack(Array(Bottle(Some(beer))))
-    val monadCrate = MonadicCrate(Array(monadPack))
+    val monadPack = Pack(List(Bottle(Some(beer))))
+    val monadCrate = MonadicCrateOfPacks(Array(monadPack))
     val monadResult = MonadStyle.getDrinkName(monadCrate, 0, 5)
     
     assertEquals(javaResult, null)
@@ -78,8 +78,8 @@ class NavigationEquivalenceTest extends FunSuite:
     val exResult = ExceptionStyle.getDrinkName(exCrate, 0, 0)
     
     // Monad
-    val monadPack = MonadicPack(Array(Bottle(None)))
-    val monadCrate = MonadicCrate(Array(monadPack))
+    val monadPack = Pack(List(Bottle(None)))
+    val monadCrate = MonadicCrateOfPacks(Array(monadPack))
     val monadResult = MonadStyle.getDrinkName(monadCrate, 0, 0)
     
     assertEquals(javaResult, null)
@@ -103,12 +103,29 @@ class NavigationEquivalenceTest extends FunSuite:
     val exTotal = ExceptionStyle.totalVolume(exCrate)
     
     // Monad
-    val monadPack1 = MonadicPack(bottles1.clone())
-    val monadPack2 = MonadicPack(bottles2.clone())
-    val monadCrate = MonadicCrate(Array(monadPack1, monadPack2))
+    val monadPack1 = Pack(List(Bottle(Some(beer)), Bottle(Some(wine))))
+    val monadPack2 = Pack(List(Bottle(None), Bottle(Some(water))))
+    val monadCrate = MonadicCrateOfPacks(Array(monadPack1, monadPack2))
     val monadTotal = MonadStyle.totalVolume(monadCrate)
     
     val expected = 500 + 750 + 330 // beer + wine + water
     assertEquals(javaTotal, expected)
     assertEquals(exTotal, expected)
     assertEquals(monadTotal, expected)
+  
+  test("all three handle empty crate"):
+    // Java
+    val javaCrate = JavaCrate(Array())
+    val javaTotal = JavaStyle.totalVolume(javaCrate)
+    
+    // Exception
+    val exCrate = ExceptionCrate(Array())
+    val exTotal = ExceptionStyle.totalVolume(exCrate)
+    
+    // Monad
+    val monadCrate = MonadicCrateOfPacks(Array())
+    val monadTotal = MonadStyle.totalVolume(monadCrate)
+    
+    assertEquals(javaTotal, 0)
+    assertEquals(exTotal, 0)
+    assertEquals(monadTotal, 0)
