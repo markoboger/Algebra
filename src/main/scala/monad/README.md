@@ -69,16 +69,12 @@ This genuinely calls `Option.flatMap` and `Option.map`.
 
 ## Part B: Domain Monads
 
-Generic containers `Pack[T]` and `Crate[T]` with lawful map/flatMap/withFilter.
+**Pack[T]** is a lawful monad with proper flatMap.
 
 ```scala
 case class Pack[T](items: List[T]):
   def flatMap[U](f: T => Pack[U]): Pack[U] = 
     Pack(items.flatMap(t => f(t).items))
-
-case class Crate[T](packs: List[Pack[T]]):
-  def flatMap[U](f: T => Pack[U]): Crate[U] = 
-    Crate(packs.map(_.flatMap(f)))
 ```
 
 **For-comprehension:**
@@ -91,9 +87,11 @@ yield y
 
 Calls `Pack.flatMap` on our domain type.
 
+**Crate[T]** is a functor (not a monad) with map and flatten operations. A monad would require `flatMap[U](f: T => Crate[U]): Crate[U]`, but our domain doesn't support that semantics cleanly.
+
 ## Part C: Teaching Maybe
 
-A minimal monad (Just/Nothing) that doesn't shadow stdlib.
+A minimal monad (Just/Empty) that doesn't shadow stdlib.
 
 ```scala
 sealed trait Maybe[+T]:
@@ -101,7 +99,17 @@ sealed trait Maybe[+T]:
   def map[U](f: T => U): Maybe[U]
 
 case class Just[T](value: T) extends Maybe[T]
-case object Nothing extends Maybe[Nothing]
+case object Empty extends Maybe[Nothing]
+```
+
+With `toMaybe` extension, navigation reads cleanly:
+```scala
+for
+  crate <- crateOpt.toMaybe
+  pack <- crate.pack(i).toMaybe
+  bottle <- pack.bottle(j).toMaybe
+  drink <- bottle.content.toMaybe
+yield drink.name
 ```
 
 Demonstrates that Option itself is just a monad.
@@ -114,7 +122,10 @@ All tested with ScalaCheck property-based tests:
 2. **Right identity**: `m.flatMap(pure) ≡ m`
 3. **Associativity**: `m.flatMap(f).flatMap(g) ≡ m.flatMap(x => f(x).flatMap(g))`
 
-Laws verified for Pack[T], Crate[T], and Maybe[T] with structural equality.
+Laws verified for:
+- **Pack[T]**: Full monad (5 monad + 2 functor laws)
+- **Crate[T]**: Functor only (2 functor laws)
+- **Maybe[T]**: Full monad (5 monad + 2 functor laws)
 
 ## Testing
 
@@ -123,7 +134,7 @@ sbt test  # All tests pass
 ```
 
 - **5 equivalence tests**: All three navigation styles produce identical results
-- **15 property-based law tests**: Pack, Crate, Maybe monad/functor laws
+- **12 property-based law tests**: Pack (monad), Crate (functor), Maybe (monad) laws
 
 ## Comparison
 
@@ -138,7 +149,7 @@ sbt test  # All tests pass
 
 1. **Option.flatMap is the real monad**: The navigation for-comprehension desugars to `Option.flatMap`, demonstrating monadic composition.
 
-2. **Domain monads are separate**: Pack[T] and Crate[T] show how to build your own monads with lawful flatMap that stays within the same type.
+2. **Domain monads are separate**: Pack[T] is a lawful monad. Crate[T] is a functor (not a full monad—that would require `flatMap[U](f: T => Crate[U]): Crate[U]`, which doesn't fit our domain cleanly).
 
 3. **Laws enable reasoning**: Monad laws guarantee that `m.flatMap(f).flatMap(g)` can be refactored to `m.flatMap(x => f(x).flatMap(g))` without changing behavior.
 

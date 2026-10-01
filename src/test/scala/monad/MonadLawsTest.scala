@@ -18,7 +18,7 @@ class MonadLawsTest extends ScalaCheckSuite:
   
   implicit val arbMaybe: Arbitrary[Maybe[Int]] = Arbitrary(
     Gen.oneOf(
-      Gen.const(Nothing),
+      Gen.const(Empty),
       Gen.choose(1, 100).map(Just(_))
     )
   )
@@ -55,25 +55,7 @@ class MonadLawsTest extends ScalaCheckSuite:
       pack.map(x => f(g(x))) == pack.map(g).map(f)
     }
   
-  // Crate[T] monad laws
-  
-  property("Crate left identity"):
-    forAll { (n: Int) =>
-      val f = (x: Int) => Pack(List(x, x * 2))
-      Crate.pure(n).flatMap(f) == Crate(List(f(n)))
-    }
-  
-  property("Crate right identity"):
-    forAll { (crate: Crate[Int]) =>
-      crate.flatMap(Pack.pure) == crate
-    }
-  
-  property("Crate associativity"):
-    forAll { (crate: Crate[Int]) =>
-      val f = (x: Int) => Pack(List(x, x + 1))
-      val g = (x: Int) => Pack(List(x * 2))
-      crate.flatMap(f).flatMap(g) == crate.flatMap(x => f(x).flatMap(g))
-    }
+  // Crate[T] functor laws (Crate is a functor, not a monad)
   
   property("Crate functor identity"):
     forAll { (crate: Crate[Int]) =>
@@ -91,7 +73,7 @@ class MonadLawsTest extends ScalaCheckSuite:
   
   property("Maybe left identity"):
     forAll { (n: Int) =>
-      val f = (x: Int) => if x % 2 == 0 then Just(x) else Nothing
+      val f = (x: Int) => if x % 2 == 0 then Just(x) else Empty
       Maybe.pure(n).flatMap(f) == f(n)
     }
   
@@ -102,7 +84,7 @@ class MonadLawsTest extends ScalaCheckSuite:
   
   property("Maybe associativity"):
     forAll { (m: Maybe[Int]) =>
-      val f = (x: Int) => if x > 50 then Just(x) else Nothing
+      val f = (x: Int) => if x > 50 then Just(x) else Empty
       val g = (x: Int) => Just(x * 2)
       m.flatMap(f).flatMap(g) == m.flatMap(x => f(x).flatMap(g))
     }

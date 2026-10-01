@@ -80,7 +80,7 @@ object Demo:
     println(s"  Monad Style:     ${monadTotal}ml")
   
   def demonstrateDomainMonads(): Unit =
-    println("\n--- Domain Monads: Pack[T].flatMap, Crate[T].flatMap ---")
+    println("\n--- Domain Monads: Pack[T] (monad), Crate[T] (functor) ---")
     
     val pack = Pack(List(1, 2, 3))
     val doubled = pack.map(_ * 2)
@@ -93,9 +93,17 @@ object Demo:
     val flattened = crate.flatten
     println(s"  Crate.flatten: ${crate.bottles} -> $flattened")
     
-    // For-comprehension using domain monads
+    // For-comprehension using Pack monad
     val result = for
       x <- pack
       y <- Pack(List(x, x + 1))
     yield y * 2
-    println(s"  For-comprehension: $result")
+    println(s"  Pack for-comprehension: $result")
+    
+    // Maybe navigation (mirror of Option)
+    import Maybe.toMaybe
+    val beer = Drink("Beer", 500)
+    val monadPack = MonadicPack(Array(Bottle(Some(beer))))
+    val monadCrate = MonadicCrate(Array(monadPack))
+    val maybeResult = Maybe.navigateWithMaybe(Some(monadCrate), 0, 0)
+    println(s"  Maybe navigation: $maybeResult")

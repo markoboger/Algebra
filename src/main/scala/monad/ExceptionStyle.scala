@@ -38,18 +38,24 @@ object ExceptionStyle:
       case _: NoSuchBottleException => null
       case _: EmptyBottleException => null
   
-  /** Aggregate: total volume with exception handling. */
+  /** Aggregate: total volume using indexed access with exceptions. */
   def totalVolume(crate: ExceptionCrate): Int =
     var total = 0
+    var packIdx = 0
     try
-      for pack <- crate.allPacks do
+      while true do  // Will throw when out of packs
+        val pack = crate.pack(packIdx)
+        var bottleIdx = 0
         try
-          for bottle <- pack.allBottles do
+          while true do  // Will throw when out of bottles
+            val bottle = pack.bottle(bottleIdx)
             bottle.content match
               case Some(drink) => total += drink.volumeMl
               case None => ()
+            bottleIdx += 1
         catch
-          case _: NoSuchBottleException => ()
+          case _: NoSuchBottleException => ()  // End of bottles in this pack
+        packIdx += 1
     catch
-      case _: NoSuchPackException => ()
+      case _: NoSuchPackException => ()  // End of packs
     total

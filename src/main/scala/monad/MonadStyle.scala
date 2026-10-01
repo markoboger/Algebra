@@ -84,75 +84,84 @@ case class Pack[T](items: List[T]):
 object Pack:
   def pure[T](value: T): Pack[T] = Pack(List(value))
 
-/** Crate[T] is a lawful monad (container of containers).
+/** Crate[T] is a functor (not a full monad).
  *
- * Similar laws as Pack, verified by property tests.
+ * It has map but not a lawful monad flatMap. A monad would require
+ * flatMap[U](f: T => Crate[U]): Crate[U], but our domain doesn't
+ * support that semantics cleanly.
+ *
+ * Instead, we provide:
+ * - map: transform all items
+ * - flatten: extract all items into a single Pack
+ * - bottles: extract all items as a List
  */
 case class Crate[T](packs: List[Pack[T]]):
   
   def map[U](f: T => U): Crate[U] =
     Crate(packs.map(_.map(f)))
   
-  /** FlatMap: f returns Pack[U], we get Crate[U].
-   *
-   * This enables: for x <- crate; y <- f(x) yield ...
-   */
-  def flatMap[U](f: T => Pack[U]): Crate[U] =
-    Crate(packs.map(_.flatMap(f)))
-  
-  def withFilter(p: T => Boolean): Crate[T] =
-    Crate(packs.map(_.withFilter(p)))
-  
-  /** Flatten one level: extract all items from all packs. */
+  /** Extract all items from all packs as a List. */
   def bottles: List[T] =
     packs.flatMap(_.items)
   
-  /** Demonstrate cross-level composition. */
+  /** Extract all items from all packs as a single Pack. */
   def flatten: Pack[T] =
     Pack(packs.flatMap(_.items))
 
 object Crate:
-  def pure[T](value: T): Crate[T] = Crate(List(Pack.pure(value)))
-  
   /** Lift a pack into a crate. */
   def apply[T](pack: Pack[T]): Crate[T] = Crate(List(pack))
 
 // ===== Part C: Teaching Maybe Monad =====
 
-/** Maybe[T]: a teaching monad (doesn't shadow stdlib Option).
+/** Maybe[T]: a teaching monad (doesn't shadow stdlib).
  *
  * Laws identical to Option, verified by tests.
  */
 sealed trait Maybe[+T]:
   def map[U](f: T => U): Maybe[U] = this match
     case Just(value) => Just(f(value))
-    case Nothing => Nothing
+    case Empty => Empty
   
   def flatMap[U](f: T => Maybe[U]): Maybe[U] = this match
     case Just(value) => f(value)
-    case Nothing => Nothing
+    case Empty => Empty
   
   def withFilter(p: T => Boolean): Maybe[T] = this match
     case Just(value) if p(value) => this
-    case _ => Nothing
+    case _ => Empty
 
 case class Just[T](value: T) extends Maybe[T]
-case object Nothing extends Maybe[Nothing]
+case object Empty extends Maybe[Nothing]
 
 object Maybe:
   def pure[T](value: T): Maybe[T] = Just(value)
   
-  /** Demonstrate: navigation using Maybe instead of Option. */
+  /** Convert Option to Maybe. */
+  extension [T](opt: Option[T])
+    def toMaybe: Maybe[T] = opt match
+      case Some(value) => Just(value)
+      case None => Empty
+  
+  /** Demonstrate: navigation using Maybe (mirror of Option version).
+   *
+   * Desugars to:
+   *   crateOpt.toMaybe.flatMap { crate =>
+   *     crate.pack(packIdx).toMaybe.flatMap { pack =>
+   *       pack.bottle(bottleIdx).toMaybe.flatMap { bottle =>
+   *         bottle.content.toMaybe.map(_.name)
+   *       }
+   *     }
+   *   }
+   */
   def navigateWithMaybe(
-    packOpt: Maybe[MonadicPack],
+    crateOpt: Option[MonadicCrate],
+    packIdx: Int,
     bottleIdx: Int
   ): Maybe[String] =
     for
-      pack <- packOpt                    // Maybe.flatMap
-      bottle <- pack.bottle(bottleIdx)   // Option (convert to Maybe)
-        .map(b => Just(b))
-        .getOrElse(Nothing)
-      drink <- bottle.content            // Option (convert to Maybe)
-        .map(d => Just(d))
-        .getOrElse(Nothing)
+      crate <- crateOpt.toMaybe           // Maybe.flatMap
+      pack <- crate.pack(packIdx).toMaybe  // Maybe.flatMap
+      bottle <- pack.bottle(bottleIdx).toMaybe // Maybe.flatMap
+      drink <- bottle.content.toMaybe     // Maybe.map
     yield drink.name
