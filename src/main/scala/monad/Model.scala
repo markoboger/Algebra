@@ -1,4 +1,6 @@
 package monad
 
 case class Drink(name: String, volumeMl: Int)
-case class Bottle(content: Option[Drink])
+
+/** Pure null model: Bottle with nullable drink. */
+case class Bottle(drink: Drink | Null)

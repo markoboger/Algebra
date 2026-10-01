@@ -11,20 +11,20 @@ class EquivalenceTest extends FunSuite:
   
   test("all three compute same total volume - happy path"):
     // Java
-    val javaPack1 = JavaPack(List(Bottle(Some(beer)), Bottle(Some(wine))))
-    val javaPack2 = JavaPack(List(Bottle(None), Bottle(Some(water))))
+    val javaPack1 = JavaPack(List(Bottle(beer), Bottle(wine)))
+    val javaPack2 = JavaPack(List(Bottle(null), Bottle(water)))
     val javaCrate = JavaCrate(List(javaPack1, javaPack2))
     val javaTotal = JavaStyle.totalVolume(javaCrate)
     
     // Exception
-    val exPack1 = ExceptionPack(List(Bottle(Some(beer)), Bottle(Some(wine))))
-    val exPack2 = ExceptionPack(List(Bottle(None), Bottle(Some(water))))
+    val exPack1 = ExceptionPack(List(Bottle(beer), Bottle(wine)))
+    val exPack2 = ExceptionPack(List(Bottle(null), Bottle(water)))
     val exCrate = ExceptionCrate(List(exPack1, exPack2))
     val exTotal = ExceptionStyle.totalVolume(exCrate)
     
     // Monad
-    val monadPack1 = Pack(List(Bottle(Some(beer)), Bottle(Some(wine))))
-    val monadPack2 = Pack(List(Bottle(None), Bottle(Some(water))))
+    val monadPack1 = Pack(List(Bottle(beer), Bottle(wine)))
+    val monadPack2 = Pack(List(Bottle(null), Bottle(water)))
     val monadCrate = Crate(List(monadPack1, monadPack2))
     val monadTotal = MonadStyle.totalVolume(monadCrate)
     
@@ -34,18 +34,18 @@ class EquivalenceTest extends FunSuite:
     assertEquals(monadTotal, expected)
   
   test("all three handle empty bottles"):
-    // Java
-    val javaPack = JavaPack(List(Bottle(None), Bottle(None)))
+    // Java: null drinks
+    val javaPack = JavaPack(List(Bottle(null), Bottle(null)))
     val javaCrate = JavaCrate(List(javaPack))
     val javaTotal = JavaStyle.totalVolume(javaCrate)
     
-    // Exception
-    val exPack = ExceptionPack(List(Bottle(None), Bottle(None)))
+    // Exception: null drinks
+    val exPack = ExceptionPack(List(Bottle(null), Bottle(null)))
     val exCrate = ExceptionCrate(List(exPack))
     val exTotal = ExceptionStyle.totalVolume(exCrate)
     
-    // Monad
-    val monadPack = Pack(List(Bottle(None), Bottle(None)))
+    // Monad: null drinks
+    val monadPack = Pack(List(Bottle(null), Bottle(null)))
     val monadCrate = Crate(List(monadPack))
     val monadTotal = MonadStyle.totalVolume(monadCrate)
     
@@ -53,16 +53,16 @@ class EquivalenceTest extends FunSuite:
     assertEquals(exTotal, 0)
     assertEquals(monadTotal, 0)
   
-  test("all three handle null/missing packs"):
-    // Java
+  test("all three handle missing packs"):
+    // Java: null packs
     val javaCrate = JavaCrate(List(null, null))
     val javaTotal = JavaStyle.totalVolume(javaCrate)
     
-    // Exception
+    // Exception: empty pack list
     val exCrate = ExceptionCrate(List())
     val exTotal = ExceptionStyle.totalVolume(exCrate)
     
-    // Monad
+    // Monad: empty pack list
     val monadCrate = Crate(List.empty[Pack[Bottle]])
     val monadTotal = MonadStyle.totalVolume(monadCrate)
     
@@ -71,15 +71,15 @@ class EquivalenceTest extends FunSuite:
     assertEquals(monadTotal, 0)
   
   test("all three handle empty crate"):
-    // Java
+    // Java: empty crate
     val javaCrate = JavaCrate(List())
     val javaTotal = JavaStyle.totalVolume(javaCrate)
     
-    // Exception
+    // Exception: empty crate
     val exCrate = ExceptionCrate(List())
     val exTotal = ExceptionStyle.totalVolume(exCrate)
     
-    // Monad
+    // Monad: empty crate
     val monadCrate = Crate(List.empty[Pack[Bottle]])
     val monadTotal = MonadStyle.totalVolume(monadCrate)
     
@@ -87,19 +87,25 @@ class EquivalenceTest extends FunSuite:
     assertEquals(exTotal, 0)
     assertEquals(monadTotal, 0)
   
-  test("all three handle mix of null bottles in Java style"):
-    // Java
-    val javaPack = JavaPack(List(Bottle(Some(beer)), null, Bottle(Some(wine))))
+  test("all three handle null crate (Java only)"):
+    // Java: null crate
+    val javaTotal = JavaStyle.totalVolume(null)
+    
+    assertEquals(javaTotal, 0)
+  
+  test("all three handle mix of null bottles"):
+    // Java: null bottles in list
+    val javaPack = JavaPack(List(Bottle(beer), null, Bottle(wine)))
     val javaCrate = JavaCrate(List(javaPack))
     val javaTotal = JavaStyle.totalVolume(javaCrate)
     
-    // Exception (no null bottles)
-    val exPack = ExceptionPack(List(Bottle(Some(beer)), Bottle(Some(wine))))
+    // Exception: only existing bottles (no null bottles in list)
+    val exPack = ExceptionPack(List(Bottle(beer), Bottle(wine)))
     val exCrate = ExceptionCrate(List(exPack))
     val exTotal = ExceptionStyle.totalVolume(exCrate)
     
-    // Monad (no null bottles)
-    val monadPack = Pack(List(Bottle(Some(beer)), Bottle(Some(wine))))
+    // Monad: only existing bottles (no null bottles in list)
+    val monadPack = Pack(List(Bottle(beer), Bottle(wine)))
     val monadCrate = Crate(List(monadPack))
     val monadTotal = MonadStyle.totalVolume(monadCrate)
     

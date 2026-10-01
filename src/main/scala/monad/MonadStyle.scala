@@ -4,9 +4,8 @@ package monad
  *
  * Design note: Both Pack and Crate are independent sequence-like containers,
  * each with lawful flatMap and unit. When nesting (Crate[Pack[Bottle]]),
- * we use .toCrate to convert a Pack into a single-Pack Crate, enabling
- * for pack <- crate; bottle <- pack.toCrate yield ... to call Crate.flatMap
- * and Crate.map legitimately. This avoids the pitfall of re-chunking flatMap
+ * we use .toCrate to convert a Pack into a Crate, enabling the for-comprehension
+ * to call Crate.flatMap throughout. This avoids the pitfall of re-chunking flatMap
  * that breaks right identity.
  */
 
@@ -66,21 +65,21 @@ object Crate:
 
 object MonadStyle:
   
-  /** Aggregate: total volume using genuine monad flatMap over Pack and Crate.
+  /** Aggregate: total volume using genuine monad flatMap over Crate.
    *
-   * Demonstrates for-comprehension calling Pack.flatMap and Crate.flatMap:
-   *   for pack <- crate       desugars to Crate.flatMap
+   * Demonstrates for-comprehension calling Crate.flatMap throughout:
+   *   for pack <- crate                desugars to Crate.flatMap
    *       bottle <- pack.toCrate       desugars to Crate.flatMap
-   *       drink <- Crate(...)          desugars to Crate.map
+   *       drink <- (match expression)  desugars to Crate.map (last generator)
    *   yield drink.volumeMl
    */
   def totalVolume(crate: Crate[Pack[Bottle]]): Int =
     val result = for
       pack <- crate                   // Crate[Pack[Bottle]].flatMap
       bottle <- pack.toCrate          // Crate[Bottle].flatMap (via Pack.toCrate)
-      drink <- bottle.content match   // Crate[Drink].map
-        case Some(d) => Crate.pure(d)
-        case None => Crate.empty
+      drink <- bottle.drink match     // Crate[Drink].map (map because it's the last generator before yield)
+        case d: Drink => Crate.pure(d)
+        case null => Crate.empty
     yield drink.volumeMl
     
     result.items.sum
