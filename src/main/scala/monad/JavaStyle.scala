@@ -1,64 +1,61 @@
 package monad
 
-/** Java-style imperative approach with null checks.
+/** Java-style: accessors return null, deep nesting of null checks.
  *
- * This is how a Java developer would handle missing data before Java 8 Optional.
- * Uses null to represent missing bottles/packs, requiring defensive checks
- * at every access. This is honest Java style, not exaggerated.
+ * Scenario: Navigate crate → pack(i) → bottle(j) → drink.name
+ * Each step can be null, requiring defensive checks at every level.
  */
 
-/** Java-style data structures (using null for missing elements). */
-case class JavaPack(bottles: List[Bottle | Null] | Null)
-case class JavaCrate(packs: List[JavaPack | Null] | Null)
+class JavaCrate(packs: Array[JavaPack | Null]):
+  def pack(index: Int): JavaPack | Null =
+    if index >= 0 && index < packs.length then packs(index) else null
+  
+  def allPacks: Array[JavaPack | Null] = packs
+
+class JavaPack(bottles: Array[Bottle | Null]):
+  def bottle(index: Int): Bottle | Null =
+    if index >= 0 && index < bottles.length then bottles(index) else null
+  
+  def allBottles: Array[Bottle | Null] = bottles
 
 object JavaStyle:
   
-  /** Count full bottles in a crate with null checks at every level.
+  /** Navigate: crate → pack(i) → bottle(j) → drink.name
    *
-   * Fixed bug from slide 26: original used `crate2.packs` instead of `crate.packs`.
+   * Five levels of nesting to reach the drink name.
    */
-  def countFullBottles(crate: JavaCrate | Null): Int =
-    var count = 0
-    
+  def getDrinkName(crate: JavaCrate | Null, packIdx: Int, bottleIdx: Int): String | Null =
     if crate != null then
-      val packs = crate.packs  // Fixed: was crate2.packs in slide!
-      if packs != null then
-        var i = 0
-        while i < packs.length do
-          val pack = packs(i)
-          if pack != null then
-            val bottles = pack.bottles
-            if bottles != null then
-              var j = 0
-              while j < bottles.length do
-                val bottle = bottles(j)
-                if bottle != null && bottle.full then
-                  count += 1
-                j += 1
-          i += 1
-    
-    count
+      val pack = crate.pack(packIdx)
+      if pack != null then
+        val bottle = pack.bottle(bottleIdx)
+        if bottle != null then
+          val content = bottle.content
+          if content.isDefined then
+            val drink = content.get
+            drink.name
+          else null
+        else null
+      else null
+    else null
   
-  /** Consume all bottles in a crate with null checks. */
-  def consumeAll(crate: JavaCrate | Null): List[Bottle] =
-    val consumed = scala.collection.mutable.ListBuffer[Bottle]()
-    
+  /** Aggregate: total volume of all full bottles. */
+  def totalVolume(crate: JavaCrate | Null): Int =
+    var total = 0
     if crate != null then
-      val packs = crate.packs
+      val packs = crate.allPacks
       if packs != null then
         var i = 0
         while i < packs.length do
           val pack = packs(i)
           if pack != null then
-            val bottles = pack.bottles
+            val bottles = pack.allBottles
             if bottles != null then
               var j = 0
               while j < bottles.length do
                 val bottle = bottles(j)
-                if bottle != null then
-                  consumed += bottle.consume()
+                if bottle != null && bottle.content.isDefined then
+                  total += bottle.content.get.volumeMl
                 j += 1
           i += 1
-    
-    consumed.toList
-
+    total

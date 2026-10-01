@@ -1,70 +1,55 @@
 package monad
 
-/** Exception-based error handling approach.
- *
- * In this style, domain accessors throw exceptions when data is missing,
- * and client code uses try-catch to handle errors. This is how an experienced
- * Java developer would structure exception-based error handling.
- */
+/** Exception-style: accessors throw domain exceptions, client uses try-catch. */
 
-class MissingBottleException extends Exception("Bottle is missing")
-class MissingPackException extends Exception("Pack is missing")
+class NoSuchPackException extends Exception("Pack not found")
+class NoSuchBottleException extends Exception("Bottle not found")
+class EmptyBottleException extends Exception("Bottle is empty")
 
-/** A pack where accessing bottles may throw. */
-case class ExceptionPack(private val bottles: List[Bottle | Null]):
-  def getBottles: List[Bottle] =
-    if bottles == null then throw MissingBottleException()
-    // Filter out nulls and return valid bottles
-    bottles.filter(_ != null).asInstanceOf[List[Bottle]]
+class ExceptionCrate(packs: Array[ExceptionPack]):
+  def pack(index: Int): ExceptionPack =
+    if index >= 0 && index < packs.length then packs(index)
+    else throw NoSuchPackException()
+  
+  def allPacks: Array[ExceptionPack] = packs
 
-/** A crate where accessing packs may throw. */
-case class ExceptionCrate(private val packs: List[ExceptionPack | Null]):
-  def getPacks: List[ExceptionPack] =
-    if packs == null then throw MissingPackException()
-    // Filter out nulls and return valid packs
-    packs.filter(_ != null).asInstanceOf[List[ExceptionPack]]
+class ExceptionPack(bottles: Array[Bottle]):
+  def bottle(index: Int): Bottle =
+    if index >= 0 && index < bottles.length then bottles(index)
+    else throw NoSuchBottleException()
+  
+  def allBottles: Array[Bottle] = bottles
 
 object ExceptionStyle:
   
-  /** Count full bottles, catching exceptions when data is missing. */
-  def countFullBottles(crate: ExceptionCrate): Int =
-    var count = 0
+  /** Navigate: crate → pack(i) → bottle(j) → drink.name
+   *
+   * Single try block with multiple catch clauses for different failure modes.
+   */
+  def getDrinkName(crate: ExceptionCrate, packIdx: Int, bottleIdx: Int): String | Null =
     try
-      val packs = crate.getPacks
-      for pack <- packs do
-        try
-          val bottles = pack.getBottles
-          for bottle <- bottles do
-            if bottle.full then count += 1
-        catch
-          case _: MissingBottleException => 
-            // Skip bottles in this pack that are missing
-            ()
+      val pack = crate.pack(packIdx)
+      val bottle = pack.bottle(bottleIdx)
+      bottle.content match
+        case Some(drink) => drink.name
+        case None => throw EmptyBottleException()
     catch
-      case _: MissingPackException => 
-        // Skip packs that are missing
-        ()
-    
-    count
+      case _: NoSuchPackException => null
+      case _: NoSuchBottleException => null
+      case _: EmptyBottleException => null
   
-  /** Consume all accessible bottles. */
-  def consumeAll(crate: ExceptionCrate): List[Bottle] =
-    val consumed = scala.collection.mutable.ListBuffer[Bottle]()
+  /** Aggregate: total volume with exception handling. */
+  def totalVolume(crate: ExceptionCrate): Int =
+    var total = 0
     try
-      val packs = crate.getPacks
-      for pack <- packs do
+      for pack <- crate.allPacks do
         try
-          val bottles = pack.getBottles
-          for bottle <- bottles do
-            consumed += bottle.consume()
+          for bottle <- pack.allBottles do
+            bottle.content match
+              case Some(drink) => total += drink.volumeMl
+              case None => ()
         catch
-          case _: MissingBottleException => 
-            // Skip bottles in this pack that are missing
-            ()
+          case _: NoSuchBottleException => ()
     catch
-      case _: MissingPackException => 
-        // Skip packs that are missing
-        ()
-    
-    consumed.toList
-
+      case _: NoSuchPackException => ()
+    total

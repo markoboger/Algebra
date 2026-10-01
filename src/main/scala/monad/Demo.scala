@@ -1,120 +1,101 @@
 package monad
 
-/** Demonstration comparing three approaches side-by-side.
- *
- * All three handle identical test cases to enable fair comparison.
- */
+/** Side-by-side demonstration of three approaches to navigating nested data. */
 object Demo:
   
   def main(args: Array[String]): Unit =
     println("=" * 70)
-    println("Monad Teaching Example: Three Approaches to Handling Missing Data")
+    println("Part A: Navigation Through Nested, Possibly-Missing Data")
     println("=" * 70)
     
-    testCase1()
-    testCase2()
-    testCase3()
+    testNavigation()
+    testAggregate()
     
     println("\n" + "=" * 70)
-    println("Comparison:")
-    println("  Java Style: Manual null checks at every level (verbose, error-prone)")
-    println("  Exception Style: Domain throws, client catches (cleaner but expensive)")
-    println("  Monad Style: For-comprehensions over lawful monads (flat, type-safe)")
+    println("Part B: Custom Domain Monads (Pack[T], Crate[T])")
+    println("=" * 70)
+    
+    demonstrateDomainMonads()
+    
+    println("\n" + "=" * 70)
+    println("Summary:")
+    println("  Java: Deep nesting, null checks at every level")
+    println("  Exception: Try-catch, cleaner but expensive")
+    println("  Monad: Single for-comprehension, Option.flatMap/map composition")
     println("=" * 70)
   
-  def testCase1(): Unit =
-    println("\n--- Test Case 1: Complete Crate (no missing data) ---")
+  def testNavigation(): Unit =
+    println("\n--- Navigation: crate → pack(0) → bottle(1) → drink.name ---")
+    
+    // Shared data
+    val beer = Drink("Beer", 500)
+    val wine = Drink("Wine", 750)
     
     // Java style
-    val javaPacks = List(
-      JavaPack(List(Bottle(), Bottle())),
-      JavaPack(List(Bottle(), Bottle(), Bottle()))
-    )
-    val javaCrate = JavaCrate(javaPacks)
-    val javaCount = JavaStyle.countFullBottles(javaCrate)
+    val javaPack0 = JavaPack(Array(Bottle(Some(beer)), Bottle(Some(wine)), null))
+    val javaCrate = JavaCrate(Array(javaPack0, null))
+    val javaResult = JavaStyle.getDrinkName(javaCrate, 0, 1)
     
     // Exception style
-    val exPacks = List(
-      ExceptionPack(List(Bottle(), Bottle())),
-      ExceptionPack(List(Bottle(), Bottle(), Bottle()))
-    )
-    val exCrate = ExceptionCrate(exPacks)
-    val exCount = ExceptionStyle.countFullBottles(exCrate)
+    val exPack0 = ExceptionPack(Array(Bottle(Some(beer)), Bottle(Some(wine))))
+    val exCrate = ExceptionCrate(Array(exPack0))
+    val exResult = ExceptionStyle.getDrinkName(exCrate, 0, 1)
     
     // Monad style
-    val monadPacks = List(
-      MonadStyle.Pack(List(Some(Bottle()): Option[Bottle], Some(Bottle()): Option[Bottle])),
-      MonadStyle.Pack(List(Some(Bottle()): Option[Bottle], Some(Bottle()): Option[Bottle], Some(Bottle()): Option[Bottle]))
-    )
-    val monadCrate = MonadStyle.Crate(monadPacks)
-    val monadCount = MonadStyle.countFullBottles(monadCrate)
+    val monadPack0 = MonadicPack(Array(Bottle(Some(beer)), Bottle(Some(wine))))
+    val monadCrate = MonadicCrate(Array(monadPack0))
+    val monadResult = MonadStyle.getDrinkName(monadCrate, 0, 1)
     
-    println(s"  Java Style:      $javaCount full bottles")
-    println(s"  Exception Style: $exCount full bottles")
-    println(s"  Monad Style:     $monadCount full bottles")
+    println(s"  Java Style:      ${javaResult}")
+    println(s"  Exception Style: ${exResult}")
+    println(s"  Monad Style:     ${monadResult}")
   
-  def testCase2(): Unit =
-    println("\n--- Test Case 2: Missing Bottles ---")
+  def testAggregate(): Unit =
+    println("\n--- Aggregate: Total Volume of All Full Bottles ---")
     
-    // Java style: null for missing bottles
-    val javaPacks = List(
-      JavaPack(List(Bottle(), null, Bottle())),
-      JavaPack(List(null, Bottle()))
-    )
-    val javaCrate = JavaCrate(javaPacks)
-    val javaCount = JavaStyle.countFullBottles(javaCrate)
+    val beer = Drink("Beer", 500)
+    val wine = Drink("Wine", 750)
+    val water = Drink("Water", 330)
     
-    // Exception style: null causes exceptions
-    val exPacks = List(
-      ExceptionPack(List(Bottle(), null, Bottle())),
-      ExceptionPack(List(null, Bottle()))
-    )
-    val exCrate = ExceptionCrate(exPacks)
-    val exCount = ExceptionStyle.countFullBottles(exCrate)
+    // Java style
+    val javaPack1 = JavaPack(Array(Bottle(Some(beer)), Bottle(Some(wine))))
+    val javaPack2 = JavaPack(Array(Bottle(None), Bottle(Some(water))))
+    val javaCrate = JavaCrate(Array(javaPack1, javaPack2))
+    val javaTotal = JavaStyle.totalVolume(javaCrate)
     
-    // Monad style: None for missing bottles
-    val monadPacks = List(
-      MonadStyle.Pack(List(Some(Bottle()): Option[Bottle], None, Some(Bottle()))),
-      MonadStyle.Pack(List(None: Option[Bottle], Some(Bottle())))
-    )
-    val monadCrate = MonadStyle.Crate(monadPacks)
-    val monadCount = MonadStyle.countFullBottles(monadCrate)
+    // Exception style
+    val exPack1 = ExceptionPack(Array(Bottle(Some(beer)), Bottle(Some(wine))))
+    val exPack2 = ExceptionPack(Array(Bottle(None), Bottle(Some(water))))
+    val exCrate = ExceptionCrate(Array(exPack1, exPack2))
+    val exTotal = ExceptionStyle.totalVolume(exCrate)
     
-    println(s"  Java Style:      $javaCount full bottles")
-    println(s"  Exception Style: $exCount full bottles")
-    println(s"  Monad Style:     $monadCount full bottles")
+    // Monad style
+    val monadPack1 = MonadicPack(Array(Bottle(Some(beer)), Bottle(Some(wine))))
+    val monadPack2 = MonadicPack(Array(Bottle(None), Bottle(Some(water))))
+    val monadCrate = MonadicCrate(Array(monadPack1, monadPack2))
+    val monadTotal = MonadStyle.totalVolume(monadCrate)
+    
+    println(s"  Java Style:      ${javaTotal}ml")
+    println(s"  Exception Style: ${exTotal}ml")
+    println(s"  Monad Style:     ${monadTotal}ml")
   
-  def testCase3(): Unit =
-    println("\n--- Test Case 3: Missing Packs ---")
+  def demonstrateDomainMonads(): Unit =
+    println("\n--- Domain Monads: Pack[T].flatMap, Crate[T].flatMap ---")
     
-    // Java style: null for missing pack
-    val javaPacks = List(
-      JavaPack(List(Bottle(), Bottle())),
-      null,
-      JavaPack(List(Bottle()))
-    )
-    val javaCrate = JavaCrate(javaPacks)
-    val javaCount = JavaStyle.countFullBottles(javaCrate)
+    val pack = Pack(List(1, 2, 3))
+    val doubled = pack.map(_ * 2)
+    println(s"  Pack.map: $pack -> $doubled")
     
-    // Exception style: null causes exception
-    val exPacks = List(
-      ExceptionPack(List(Bottle(), Bottle())),
-      null,
-      ExceptionPack(List(Bottle()))
-    )
-    val exCrate = ExceptionCrate(exPacks)
-    val exCount = ExceptionStyle.countFullBottles(exCrate)
+    val expanded = pack.flatMap(x => Pack(List(x, x * 10)))
+    println(s"  Pack.flatMap: $pack -> $expanded")
     
-    // Monad style: empty pack for missing pack
-    val monadPacks = List(
-      MonadStyle.Pack(List(Some(Bottle()): Option[Bottle], Some(Bottle()))),
-      MonadStyle.Pack(List()),  // empty pack = no bottles
-      MonadStyle.Pack(List(Some(Bottle()): Option[Bottle]))
-    )
-    val monadCrate = MonadStyle.Crate(monadPacks)
-    val monadCount = MonadStyle.countFullBottles(monadCrate)
+    val crate = Crate(List(Pack(List(1, 2)), Pack(List(3))))
+    val flattened = crate.flatten
+    println(s"  Crate.flatten: ${crate.bottles} -> $flattened")
     
-    println(s"  Java Style:      $javaCount full bottles")
-    println(s"  Exception Style: $exCount full bottles")
-    println(s"  Monad Style:     $monadCount full bottles")
-
+    // For-comprehension using domain monads
+    val result = for
+      x <- pack
+      y <- Pack(List(x, x + 1))
+    yield y * 2
+    println(s"  For-comprehension: $result")

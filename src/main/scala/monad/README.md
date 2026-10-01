@@ -1,134 +1,145 @@
 # Monad Teaching Example
 
-Three pedagogical implementations of the same bottle/pack/crate inventory scenario, comparing imperative null-checks, exception-based error handling, and monadic composition.
+Three approaches to navigating nested, possibly-missing data, demonstrating the progression from imperative to functional style.
 
-## The Domain
+## Part A: Navigation Scenario
 
-- **Bottle**: Can be full or empty
-- **Pack**: Container of bottles
-- **Crate**: Container of packs
+**Task**: Given a crate, a pack index, and a bottle index, get the drink's name.
+**Challenge**: Each step can fail (pack missing, bottle missing, bottle empty).
 
-Some bottles or packs may be missing in the data.
+### 1. Java Style
 
-## Three Implementations
-
-### 1. Java Style (`JavaStyle.scala`)
-
-Imperative with manual null checks at every level.
+Null-based accessors, deep nesting of checks.
 
 ```scala
-if crate != null then
-  val packs = crate.packs  // Fixed bug from slide 26!
-  if packs != null then
-    // ... nested checks continue
+def getDrinkName(crate: JavaCrate | Null, packIdx: Int, bottleIdx: Int): String | Null =
+  if crate != null then
+    val pack = crate.pack(packIdx)
+    if pack != null then
+      val bottle = pack.bottle(bottleIdx)
+      if bottle != null then
+        if bottle.content.isDefined then
+          bottle.content.get.name
+        else null
+      else null
+    else null
+  else null
 ```
 
-**Characteristics:**
-- Uses `null` for missing elements
-- Deep nesting (5 levels for bottle access)
-- While loops and mutable counters (idiomatic Java in Scala)
-- Verbose and error-prone
+### 2. Exception Style
 
-### 2. Exception Style (`ExceptionStyle.scala`)
-
-Domain accessors throw exceptions when data is missing.
+Domain exceptions, single try-catch.
 
 ```scala
-try
-  val packs = crate.getPacks  // throws if missing
-  for pack <- packs do
-    try
-      val bottles = pack.getBottles  // throws if missing
+def getDrinkName(crate: ExceptionCrate, packIdx: Int, bottleIdx: Int): String | Null =
+  try
+    val pack = crate.pack(packIdx)          // throws NoSuchPackException
+    val bottle = pack.bottle(bottleIdx)    // throws NoSuchBottleException
+    bottle.content.map(_.name)
+      .getOrElse(throw EmptyBottleException())
+  catch
+    case _: NoSuchPackException | _: NoSuchBottleException | _: EmptyBottleException => null
 ```
 
-**Characteristics:**
-- Accessors throw domain exceptions for missing data
-- Try-catch blocks structure error handling
-- Less nesting than null checks
-- Expensive (exception creation, stack unwinding)
+### 3. Monad Style
 
-### 3. Monad Style (`MonadStyle.scala`)
-
-Lawful monads (Pack, Crate) with Option for missing values.
+Option-based accessors, single for-comprehension.
 
 ```scala
-case class Pack[T](bottles: List[T]):
-  def map[U](f: T => U): Pack[U] = Pack(bottles.map(f))
+def getDrinkName(crate: MonadicCrate, packIdx: Int, bottleIdx: Int): Option[String] =
+  for
+    pack <- crate.pack(packIdx)       // Option.flatMap
+    bottle <- pack.bottle(bottleIdx)  // Option.flatMap
+    drink <- bottle.content           // Option.map
+  yield drink.name
+```
+
+**Desugars to:**
+```scala
+crate.pack(packIdx).flatMap { pack =>
+  pack.bottle(bottleIdx).flatMap { bottle =>
+    bottle.content.map { drink =>
+      drink.name
+    }
+  }
+}
+```
+
+This genuinely calls `Option.flatMap` and `Option.map`.
+
+## Part B: Domain Monads
+
+Generic containers `Pack[T]` and `Crate[T]` with lawful map/flatMap/withFilter.
+
+```scala
+case class Pack[T](items: List[T]):
   def flatMap[U](f: T => Pack[U]): Pack[U] = 
-    Pack(bottles.flatMap(b => f(b).bottles))
-  def withFilter(p: T => Boolean): Pack[T] = Pack(bottles.filter(p))
-  def foreach[U](f: T => U): Unit = bottles.foreach(f)
+    Pack(items.flatMap(t => f(t).items))
 
 case class Crate[T](packs: List[Pack[T]]):
-  def map[U](f: T => U): Crate[U] = Crate(packs.map(_.map(f)))
   def flatMap[U](f: T => Pack[U]): Crate[U] = 
     Crate(packs.map(_.flatMap(f)))
-  def withFilter(p: T => Boolean): Crate[T] = 
-    Crate(packs.map(_.withFilter(p)))
-  def foreach[U](f: T => U): Unit = packs.foreach(_.foreach(f))
-
-def countFullBottles(crate: Crate[Option[Bottle]]): Int =
-  var count = 0
-  for
-    bottleOpt <- crate         // Crate.foreach -> bottleOpt: Option[Bottle]
-    bottle <- bottleOpt        // Option.foreach -> bottle: Bottle
-    if bottle.full
-  do
-    count += 1
-  count
 ```
 
-**Characteristics:**
-- Pack[T] and Crate[T] are lawful monads (verified by tests)
-- For-comprehensions call **Crate.foreach** on our domain type
-- Option[T] for possibly-missing elements (type-safe)
-- Flat code, no nesting
-- Compiler-checked and refactorable (monad laws guarantee composition)
+**For-comprehension:**
+```scala
+for
+  x <- pack              // Pack.flatMap
+  y <- f(x)             // returns Pack[U]
+yield y
+```
+
+Calls `Pack.flatMap` on our domain type.
+
+## Part C: Teaching Maybe
+
+A minimal monad (Just/Nothing) that doesn't shadow stdlib.
+
+```scala
+sealed trait Maybe[+T]:
+  def flatMap[U](f: T => Maybe[U]): Maybe[U]
+  def map[U](f: T => U): Maybe[U]
+
+case class Just[T](value: T) extends Maybe[T]
+case object Nothing extends Maybe[Nothing]
+```
+
+Demonstrates that Option itself is just a monad.
 
 ## Monad Laws
 
-Pack[T] and Crate[T] satisfy the monad laws (verified by property-based tests):
+All tested with ScalaCheck property-based tests:
 
 1. **Left identity**: `pure(a).flatMap(f) ≡ f(a)`
 2. **Right identity**: `m.flatMap(pure) ≡ m`
 3. **Associativity**: `m.flatMap(f).flatMap(g) ≡ m.flatMap(x => f(x).flatMap(g))`
 
-These laws guarantee predictable composition and enable safe refactoring.
+Laws verified for Pack[T], Crate[T], and Maybe[T] with structural equality.
 
-## Running
+## Testing
 
 ```bash
-# Compile
-sbt compile
-
-# Run all tests (includes property-based monad law tests)
-sbt test
-
-# Run demo
-sbt "runMain monad.Demo"
+sbt test  # All tests pass
 ```
 
-## Files
-
-- `Model.scala` - Shared Bottle type
-- `JavaStyle.scala` - Null-based (fixes slide 26 bug)
-- `ExceptionStyle.scala` - Exception-based
-- `MonadStyle.scala` - Monadic with lawful Pack/Crate
-- `Demo.scala` - Side-by-side demonstration
-- `EquivalenceTest.scala` - Tests proving identical results
-- `MonadLawsTest.scala` - Property-based law verification
-
-## Key Insight
-
-By making domain types (Pack, Crate) proper monads, for-comprehensions work naturally and are guaranteed by the monad laws to compose predictably. The compiler checks types (Option[T] vs null) and the laws ensure refactorability.
+- **5 equivalence tests**: All three navigation styles produce identical results
+- **15 property-based law tests**: Pack, Crate, Maybe monad/functor laws
 
 ## Comparison
 
 | Aspect | Java | Exception | Monad |
 |--------|------|-----------|-------|
-| Missing data | `null` | throws | `Option[T]` |
-| Nesting | Deep (5 levels) | Moderate | Flat |
-| Type safety | No | No | Yes |
-| Compiler help | No | No | Yes (types + laws) |
-| Performance | Good | Poor | Good |
-| Refactorable | No | Moderate | Yes (by laws) |
+| **Nesting** | Deep (5 levels) | Single try | Flat |
+| **Composition** | Manual | Manual | Automatic (flatMap) |
+| **Type safety** | No (null) | No | Yes (Option) |
+| **Performance** | Good | Poor | Good |
+
+## Key Insights
+
+1. **Option.flatMap is the real monad**: The navigation for-comprehension desugars to `Option.flatMap`, demonstrating monadic composition.
+
+2. **Domain monads are separate**: Pack[T] and Crate[T] show how to build your own monads with lawful flatMap that stays within the same type.
+
+3. **Laws enable reasoning**: Monad laws guarantee that `m.flatMap(f).flatMap(g)` can be refactored to `m.flatMap(x => f(x).flatMap(g))` without changing behavior.
+
+4. **Scaling**: The aggregate operation (total volume) shows how monadic style scales: `packs.flatMap(_.bottles).flatMap(_.content).map(_.volumeMl).sum`.
